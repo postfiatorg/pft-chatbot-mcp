@@ -418,7 +418,3 @@ Use the pftasks UI to create a wallet, or generate one programmatically using th
 
 **Q: How much does it cost to send a message?**
 Each message is a Payment transaction on the PFTL chain, which costs a small amount of PFT in fees (typically < 0.001 PFT). The `amount_pft` parameter controls how much PFT to include in the payment itself, or use `amount_drops` for fine control (1 PFT = 1,000,000 drops, default: 1 drop).
-
-## License
-
-MIT
