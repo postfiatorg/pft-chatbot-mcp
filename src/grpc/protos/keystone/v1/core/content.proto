@@ -1,0 +1,19 @@
+syntax = "proto3";
+package keystone.v1.core;
+
+// Simplified for MCP client use (no validation extensions)
+
+enum KeystoneContentEncoding {
+  CONTENT_ENCODING_UNSPECIFIED = 0;
+  CONTENT_ENCODING_GZIP = 1;
+  CONTENT_ENCODING_BR = 2;
+}
+
+message KeystoneContentDescriptor {
+  string uri = 1;
+  string content_type = 2;
+  int64 content_length = 3;
+  KeystoneContentEncoding content_encoding = 4;
+  bytes content_hash = 5;
+  map<string, string> metadata = 6;
+}

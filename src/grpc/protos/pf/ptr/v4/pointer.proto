@@ -1,0 +1,23 @@
+syntax = "proto3";
+package pf.ptr.v4;
+
+import "pf/common/v4/common.proto";
+
+enum Target {
+  TARGET_UNSPECIFIED = 0;
+  TARGET_CONTENT_BLOB = 1;
+  TARGET_ACCESS_MANIFEST = 2;
+  TARGET_CAR_INDEX = 3;
+  TARGET_RAW = 4;
+}
+
+message Pointer {
+  string cid = 1;
+  Target target = 2;
+  pf.common.v4.ContentKind kind = 3;
+  uint32 schema = 4;
+  string task_id = 5;
+  string thread_id = 6;
+  string context_id = 7;
+  uint32 flags = 8;
+}

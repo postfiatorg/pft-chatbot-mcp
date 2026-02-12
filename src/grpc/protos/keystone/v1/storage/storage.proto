@@ -1,0 +1,68 @@
+syntax = "proto3";
+package keystone.v1.storage;
+
+import "keystone/v1/core/envelope.proto";
+import "keystone/v1/core/content.proto";
+
+// Simplified for MCP client -- only methods we actually call
+
+enum KeystoneStorageBackend {
+  STORAGE_BACKEND_UNSPECIFIED = 0;
+  STORAGE_BACKEND_INLINE = 1;
+  STORAGE_BACKEND_IPFS = 2;
+  STORAGE_BACKEND_ARWEAVE = 3;
+  STORAGE_BACKEND_EVM_CALLDATA = 4;
+  STORAGE_BACKEND_XRPL_MEMO = 5;
+}
+
+service KeystoneContentStorageService {
+  rpc StoreContent(KeystoneStoreContentRequest) returns (KeystoneStoreContentResponse);
+}
+
+service KeystoneEnvelopeStorageService {
+  rpc StoreEnvelope(KeystoneStoreEnvelopeRequest) returns (KeystoneStoreEnvelopeResponse);
+  rpc RetrieveEnvelope(KeystoneRetrieveEnvelopeRequest) returns (KeystoneRetrieveEnvelopeResponse);
+  rpc ListEnvelopesBySender(KeystoneListEnvelopesBySenderRequest) returns (KeystoneListEnvelopesBySenderResponse);
+}
+
+// Content Storage Messages
+message KeystoneStoreContentRequest {
+  bytes content = 1;
+  string content_type = 2;
+  KeystoneStorageBackend preferred_storage = 3;
+}
+
+message KeystoneStoreContentResponse {
+  keystone.v1.core.KeystoneContentDescriptor descriptor = 1;
+}
+
+// Envelope Storage Messages
+message KeystoneStoreEnvelopeRequest {
+  keystone.v1.core.KeystoneEnvelope envelope = 1;
+  KeystoneStorageBackend preferred_storage = 2;
+}
+
+message KeystoneStoreEnvelopeResponse {
+  string envelope_id = 1;
+  KeystoneStorageBackend storage_backend = 2;
+  map<string, string> metadata = 3;
+}
+
+message KeystoneRetrieveEnvelopeRequest {
+  string envelope_id = 1;
+}
+
+message KeystoneRetrieveEnvelopeResponse {
+  keystone.v1.core.KeystoneEnvelope envelope = 1;
+}
+
+message KeystoneListEnvelopesBySenderRequest {
+  string sender = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message KeystoneListEnvelopesBySenderResponse {
+  repeated keystone.v1.core.KeystoneEnvelope envelopes = 1;
+  int32 total_count = 2;
+}

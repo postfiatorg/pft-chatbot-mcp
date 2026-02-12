@@ -1,0 +1,18 @@
+syntax = "proto3";
+package pf.common.v4;
+
+enum ContentKind {
+  CONTENT_KIND_UNSPECIFIED = 0;
+  TASK = 1;
+  TASK_UPDATE = 2;
+  TASK_SUBMISSION = 3;
+  CHAT = 4;
+  CONTEXT = 5;
+  REWARD = 6;
+  POLICY = 7;
+  IDENTITY = 8;
+  ASSET = 9;
+  DOCUMENT = 10;
+  SYSTEM = 11;
+  TEST = 99;
+}

@@ -1,0 +1,90 @@
+syntax = "proto3";
+package keystone.v1.registry;
+
+import "keystone/v1/core/envelope.proto";
+
+// Simplified for MCP client -- no A2A imports, flattened AgentCard
+
+enum PublicKeyAlgorithm {
+  PUBLIC_KEY_ALGORITHM_UNSPECIFIED = 0;
+  PUBLIC_KEY_ALGORITHM_CURVE25519 = 1;
+  PUBLIC_KEY_ALGORITHM_ED25519 = 2;
+}
+
+message KeystoneAgentCapabilities {
+  bool envelope_processing = 1;
+  bool ledger_persistence = 2;
+  bool context_dag_traversal = 3;
+  uint32 max_context_depth = 4;
+  repeated keystone.v1.core.KeystoneEncryptionMode supported_encryption_modes = 5;
+  bytes public_encryption_key = 6;
+  PublicKeyAlgorithm public_key_algorithm = 7;
+  repeated string supported_semantic_capabilities = 8;
+  repeated string attestation_uids = 9;
+  map<string, string> identity_attestations = 10;
+}
+
+// Simplified AgentCard (flattened from A2A for client use)
+message SimpleAgentCard {
+  string name = 1;
+  string description = 2;
+  string url = 3;
+  string version = 4;
+  string organization = 5;
+}
+
+service KeystoneAgentRegistryService {
+  rpc StoreAgentCard(KeystoneStoreAgentCardRequest) returns (KeystoneStoreAgentCardResponse);
+  rpc GetAgentCard(KeystoneGetAgentCardRequest) returns (KeystoneGetAgentCardResponse);
+  rpc SearchAgents(KeystoneSearchAgentsRequest) returns (KeystoneSearchAgentsResponse);
+  rpc DeleteAgentCard(KeystoneDeleteAgentCardRequest) returns (KeystoneDeleteAgentCardResponse);
+}
+
+message KeystoneStoreAgentCardRequest {
+  SimpleAgentCard agent_card = 1;
+  KeystoneAgentCapabilities keystone_capabilities = 2;
+  string agent_id = 3;
+}
+
+message KeystoneStoreAgentCardResponse {
+  string agent_id = 1;
+  SimpleAgentCard agent_card = 2;
+}
+
+message KeystoneGetAgentCardRequest {
+  string agent_id = 1;
+}
+
+message KeystoneGetAgentCardResponse {
+  string agent_id = 1;
+  SimpleAgentCard agent_card = 2;
+  KeystoneAgentCapabilities keystone_capabilities = 3;
+}
+
+message KeystoneSearchAgentsRequest {
+  string query = 1;
+  repeated string capabilities = 2;
+  string organization = 3;
+  int32 limit = 4;
+  int32 offset = 5;
+}
+
+message KeystoneSearchAgentsResponse {
+  repeated KeystoneAgentSearchResult results = 1;
+  int32 total_count = 2;
+}
+
+message KeystoneAgentSearchResult {
+  string agent_id = 1;
+  SimpleAgentCard agent_card = 2;
+  KeystoneAgentCapabilities keystone_capabilities = 3;
+  float relevance_score = 4;
+}
+
+message KeystoneDeleteAgentCardRequest {
+  string agent_id = 1;
+}
+
+message KeystoneDeleteAgentCardResponse {
+  bool deleted = 1;
+}

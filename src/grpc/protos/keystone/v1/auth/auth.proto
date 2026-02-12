@@ -1,0 +1,39 @@
+syntax = "proto3";
+package keystone.v1.auth;
+
+service KeystoneAuthService {
+  rpc RequestApiKey(RequestApiKeyRequest) returns (RequestApiKeyResponse);
+  rpc VerifyAndIssueKey(VerifyAndIssueKeyRequest) returns (VerifyAndIssueKeyResponse);
+  rpc RevokeApiKey(RevokeApiKeyRequest) returns (RevokeApiKeyResponse);
+}
+
+message RequestApiKeyRequest {
+  string wallet_address = 1;
+}
+
+message RequestApiKeyResponse {
+  string challenge_nonce = 1;
+  int64 expires_at_unix = 2;
+}
+
+message VerifyAndIssueKeyRequest {
+  string wallet_address = 1;
+  string challenge_nonce = 2;
+  string signature_hex = 3;
+  string label = 4;
+}
+
+message VerifyAndIssueKeyResponse {
+  string api_key = 1;
+  string wallet_address = 2;
+  int32 write_limit_per_hour = 3;
+  int32 read_limit_per_hour = 4;
+}
+
+message RevokeApiKeyRequest {
+  string api_key = 1;
+}
+
+message RevokeApiKeyResponse {
+  bool revoked = 1;
+}

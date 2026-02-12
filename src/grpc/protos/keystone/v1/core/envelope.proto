@@ -1,0 +1,64 @@
+syntax = "proto3";
+package keystone.v1.core;
+
+import "keystone/v1/core/content.proto";
+
+// Simplified for MCP client use (no validation extensions, no A2A imports)
+
+enum KeystoneKeyType {
+  KEY_TYPE_UNSPECIFIED = 0;
+  CONTENT_KEY = 1;
+  GROUP_KEY = 2;
+}
+
+message KeystoneAccessGrant {
+  KeystoneKeyType key_type = 1;
+  string target_id = 2;
+  bytes encrypted_key_material = 3;
+}
+
+enum KeystoneContextReferenceType {
+  CONTEXT_REFERENCE_TYPE_UNSPECIFIED = 0;
+  CONTEXT_REFERENCE_TYPE_REPLY_TO = 1;
+  CONTEXT_REFERENCE_TYPE_EXTENDS = 2;
+  CONTEXT_REFERENCE_TYPE_SUPERSEDES = 3;
+  CONTEXT_REFERENCE_TYPE_REFERENCES = 4;
+  CONTEXT_REFERENCE_TYPE_SUCCESSION = 5;
+}
+
+message KeystoneContextReference {
+  bytes content_hash = 1;
+  string group_id = 2;
+  KeystoneContextReferenceType reference_type = 3;
+  string annotation = 4;
+}
+
+enum KeystoneMessageType {
+  MESSAGE_TYPE_UNSPECIFIED = 0;
+  MESSAGE_TYPE_CORE = 1;
+  MESSAGE_TYPE_MULTIPART_PART = 2;
+}
+
+enum KeystoneEncryptionMode {
+  ENCRYPTION_MODE_UNSPECIFIED = 0;
+  ENCRYPTION_MODE_NONE = 1;
+  ENCRYPTION_MODE_PROTECTED = 2;
+  ENCRYPTION_MODE_PUBLIC_KEY = 3;
+}
+
+message KeystoneEnvelope {
+  uint32 version = 1;
+  bytes content_hash = 2;
+  KeystoneMessageType message_type = 3;
+  KeystoneEncryptionMode encryption = 4;
+  repeated KeystoneContextReference public_references = 5;
+  repeated KeystoneAccessGrant access_grants = 6;
+  bytes message = 7;
+  map<string, string> metadata = 8;
+}
+
+message KeystoneCoreMessage {
+  KeystoneContentDescriptor content_descriptor = 1;
+  repeated KeystoneContextReference context_references = 2;
+  map<string, string> metadata = 3;
+}

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "pft-chatbot-mcp": {
+      "command": "npx",
+      "args": ["tsx", "src/index.ts"],
+      "env": {
+        "_comment": "Use ONE of BOT_SEED or BOT_SEED_FILE",
+        "BOT_SEED": "<your-bot-seed>",
+        "_BOT_SEED_FILE": "/path/to/.pft-bot-seed"
+      }
+    }
+  }
+}
