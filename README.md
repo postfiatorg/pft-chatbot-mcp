@@ -8,7 +8,7 @@ This is a [Model Context Protocol](https://modelcontextprotocol.io/) server that
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| pft-chatbot-mcp | 0.1.0 | This package |
+| @postfiatorg/pft-chatbot-mcp | 0.1.0 | This package |
 | Keystone Protocol | v1 | Proto schema version |
 | pf.ptr Pointer | v4 | On-chain memo format |
 | Keystone gRPC server | >= 0.1.0 | Backend service |
@@ -71,7 +71,7 @@ Messages use the same encryption scheme as the pftasks frontend:
 
 **From npm**:
 ```bash
-npx pft-chatbot-mcp
+npx @postfiatorg/pft-chatbot-mcp
 ```
 
 **From source**:
@@ -91,7 +91,7 @@ Copy `mcp.json.example` to your LLM client's MCP configuration location.
 ```json
 {
   "mcpServers": {
-    "pft-chatbot-mcp": {
+    "@postfiatorg/pft-chatbot-mcp": {
       "command": "npx",
       "args": ["tsx", "src/index.ts"],
       "env": {
@@ -106,7 +106,7 @@ Copy `mcp.json.example` to your LLM client's MCP configuration location.
 ```json
 {
   "mcpServers": {
-    "pft-chatbot-mcp": {
+    "@postfiatorg/pft-chatbot-mcp": {
       "command": "npx",
       "args": ["tsx", "/absolute/path/to/pft-chatbot-mcp/src/index.ts"],
       "env": {
@@ -368,7 +368,7 @@ The bot's wallet seed is the most sensitive piece of configuration. Here's how i
      ```json
      {
        "mcpServers": {
-         "pft-chatbot-mcp": {
+         "@postfiatorg/pft-chatbot-mcp": {
            "command": "npx",
            "args": ["tsx", "src/index.ts"],
            "env": {

@@ -47,7 +47,7 @@ async function main() {
 
   // Create MCP server
   const server = new McpServer({
-    name: "pft-chatbot-mcp",
+    name: "@postfiatorg/pft-chatbot-mcp",
     version: MCP_VERSION,
   });
 
@@ -250,7 +250,7 @@ async function main() {
   // Log startup info to stderr (stdout is reserved for MCP protocol)
   if (setupMode) {
     process.stderr.write(
-      `pft-chatbot-mcp v${MCP_VERSION} (setup mode)\n`
+      `@postfiatorg/pft-chatbot-mcp v${MCP_VERSION} (setup mode)\n`
     );
     process.stderr.write(
       `No wallet configured. Use the create_wallet tool to generate one.\n`
@@ -260,7 +260,7 @@ async function main() {
     );
   } else {
     process.stderr.write(
-      `pft-chatbot-mcp v${MCP_VERSION} (keystone ${KEYSTONE_PROTOCOL_VERSION}, pf.ptr ${PF_PTR_VERSION})\n`
+      `@postfiatorg/pft-chatbot-mcp v${MCP_VERSION} (keystone ${KEYSTONE_PROTOCOL_VERSION}, pf.ptr ${PF_PTR_VERSION})\n`
     );
     process.stderr.write(`Wallet: ${keypair!.address}\n`);
     process.stderr.write(`Chain RPC: ${config!.pftlRpcUrl}\n`);

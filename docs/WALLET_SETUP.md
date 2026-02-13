@@ -24,7 +24,7 @@ Configure the MCP server in your LLM client **without** a `BOT_SEED`:
 ```json
 {
   "mcpServers": {
-    "pft-chatbot-mcp": {
+    "@postfiatorg/pft-chatbot-mcp": {
       "command": "npx",
       "args": ["tsx", "src/index.ts"]
     }
@@ -36,7 +36,7 @@ Configure the MCP server in your LLM client **without** a `BOT_SEED`:
 ```json
 {
   "mcpServers": {
-    "pft-chatbot-mcp": {
+    "@postfiatorg/pft-chatbot-mcp": {
       "command": "npx",
       "args": ["tsx", "/absolute/path/to/pft-chatbot-mcp/src/index.ts"]
     }
@@ -113,7 +113,7 @@ Update your MCP configuration to include the seed:
 ```json
 {
   "mcpServers": {
-    "pft-chatbot-mcp": {
+    "@postfiatorg/pft-chatbot-mcp": {
       "command": "npx",
       "args": ["tsx", "src/index.ts"],
       "env": {
@@ -128,7 +128,7 @@ Update your MCP configuration to include the seed:
 ```json
 {
   "mcpServers": {
-    "pft-chatbot-mcp": {
+    "@postfiatorg/pft-chatbot-mcp": {
       "command": "npx",
       "args": ["tsx", "src/index.ts"],
       "env": {
@@ -144,7 +144,7 @@ Update your MCP configuration to include the seed:
 Restart your LLM client (or reload the MCP server). The server should now start in **full mode** with all tools available. You'll see in the server logs:
 
 ```
-pft-chatbot-mcp v0.1.0 (keystone v1, pf.ptr v4)
+@postfiatorg/pft-chatbot-mcp v0.1.0 (keystone v1, pf.ptr v4)
 Wallet: rABC123...
 Chain RPC: https://rpc.testnet.postfiat.org
 Keystone gRPC: keystone-grpc.postfiat.org:443

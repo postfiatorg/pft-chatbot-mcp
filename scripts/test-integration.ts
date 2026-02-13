@@ -42,7 +42,7 @@ function fail(test: string, err: any) {
 }
 
 async function main() {
-  log("pft-chatbot-mcp Integration Test", `v${MCP_VERSION} (keystone ${KEYSTONE_PROTOCOL_VERSION})`);
+  log("@postfiatorg/pft-chatbot-mcp Integration Test", `v${MCP_VERSION} (keystone ${KEYSTONE_PROTOCOL_VERSION})`);
 
   // 1. Load config
   let config;

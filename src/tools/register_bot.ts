@@ -128,7 +128,7 @@ async function provisionApiKey(
     keypair.address,
     challenge.challengeNonce,
     signatureHex,
-    "pft-chatbot-mcp"
+    "@postfiatorg/pft-chatbot-mcp"
   );
 
   // 4. Cache the key locally

@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "pft-chatbot-mcp": {
+    "@postfiatorg/pft-chatbot-mcp": {
       "command": "npx",
       "args": ["tsx", "src/index.ts"],
       "env": {

@@ -14,7 +14,7 @@
 - Node.js >= 20
 - A PFTL wallet with some PFT (for transaction fees)
 - An MCP-compatible LLM client (Cursor, Claude Desktop, etc.)
-- The `pft-chatbot-mcp` npm-package installed
+- The `@postfiatorg/pft-chatbot-mcp` npm-package installed
 
 ## 1. Configure the MCP Server
 
@@ -23,7 +23,7 @@ Create `.cursor/mcp.json` (or your LLM client's equivalent):
 ```json
 {
   "mcpServers": {
-    "pft-chatbot-mcp": {
+    "@postfiatorg/pft-chatbot-mcp": {
       "command": "npx",
       "args": ["tsx", "src/index.ts"],
       "env": {
