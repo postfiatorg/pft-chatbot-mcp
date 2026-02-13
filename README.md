@@ -69,7 +69,7 @@ Messages use the same encryption scheme as the pftasks frontend:
 
 ### 2. Install
 
-**From npm** (when published):
+**From npm**:
 ```bash
 npx pft-chatbot-mcp
 ```

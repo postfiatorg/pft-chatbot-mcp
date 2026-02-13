@@ -1,0 +1,32 @@
+# Source (compiled output in dist/ is what gets published)
+src/
+scripts/
+docs/
+
+# Config & secrets
+.env
+.env.*
+!.env.example
+.keystone-api-key
+mcp.json.example
+
+# Dev tooling
+.cursor/
+.git/
+.gitignore
+tsconfig.json
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
+__tests__/
+*.test.ts
+*.spec.ts
+coverage/

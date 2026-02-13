@@ -3,16 +3,44 @@
   "version": "0.1.0",
   "description": "MCP server for enabling chatbots to work within Post Fiat Task Node Messages UI",
   "type": "module",
-  "main": "src/index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
-    "pft-chatbot-mcp": "src/index.ts"
+    "pft-chatbot-mcp": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "lint": "tsc --noEmit"
+    "build": "tsc && npm run copy-protos",
+    "copy-protos": "rm -rf dist/grpc/protos && cp -r src/grpc/protos dist/grpc/protos",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PostFiat/pft-chatbot-mcp.git"
+  },
+  "homepage": "https://github.com/PostFiat/pft-chatbot-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/PostFiat/pft-chatbot-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "post-fiat",
+    "pftl",
+    "chatbot",
+    "xrpl",
+    "keystone",
+    "llm",
+    "ai-agent"
+  ],
+  "author": "Post Fiat",
   "dependencies": {
     "@grpc/grpc-js": "^1.12.0",
     "@grpc/proto-loader": "^0.7.13",

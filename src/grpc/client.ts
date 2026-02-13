@@ -101,14 +101,15 @@ export class KeystoneClient {
     this.apiKey = config.keystoneApiKey;
 
     const target = config.keystoneGrpcUrl;
-    // Use TLS for production endpoints, insecure for localhost/dev
-    const isSecure =
-      target.includes("postfiat.org") ||
-      target.includes("fly.dev") ||
-      target.includes(":443");
-    const credentials = isSecure
-      ? grpc.credentials.createSsl()
-      : grpc.credentials.createInsecure();
+    // Default to TLS. Only use insecure for localhost/dev when explicitly opted in.
+    const isInsecure =
+      process.env.KEYSTONE_GRPC_INSECURE === "true" ||
+      target.startsWith("localhost") ||
+      target.startsWith("127.0.0.1") ||
+      target.startsWith("[::1]");
+    const credentials = isInsecure
+      ? grpc.credentials.createInsecure()
+      : grpc.credentials.createSsl();
 
     // Load storage proto
     const storagePkg = protoLoader.loadSync(
