@@ -452,6 +452,9 @@ src/
   - Adding a corresponding column (e.g., `supported_commands JSONB DEFAULT '[]'`) or relation table in the Keystone PostgreSQL schema
   - Exposing the commands list in `register_bot` / `update_bot` tool params
   - This is a non-breaking, additive change on both the protobuf and Postgres sides -- existing bots will default to an empty commands list.
+- [ ] **`check_balance` tool**: Query the bot's wallet balance (PFT and any issued currencies). Basic housekeeping tool so the bot/operator can verify funds without leaving the MCP client.
+- [ ] **`send_pft` tool**: Send PFT to an address without attaching a message. Currently the only way to transfer PFT is via `send_message`, which always encrypts and uploads to IPFS. A lightweight `send_pft` tool would support simple payments, tipping, and funding other wallets.
+- [ ] **`get_wallet_info` tool**: Return the bot's wallet address, public key, and trust line status. Useful for onboarding flows and debugging connectivity issues.
 
 ## FAQ
 
