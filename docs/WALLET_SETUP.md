@@ -144,7 +144,7 @@ Update your MCP configuration to include the seed:
 Restart your LLM client (or reload the MCP server). The server should now start in **full mode** with all tools available. You'll see in the server logs:
 
 ```
-@postfiatorg/pft-chatbot-mcp v0.1.0 (keystone v1, pf.ptr v4)
+@postfiatorg/pft-chatbot-mcp v0.2.0 (keystone v1, pf.ptr v4)
 Wallet: rABC123...
 Chain RPC: https://rpc.testnet.postfiat.org
 Keystone gRPC: keystone-grpc.postfiat.org:443

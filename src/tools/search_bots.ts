@@ -50,6 +50,11 @@ export async function executeSearchBots(
     wallet_address: "",
     capabilities:
       r.keystoneCapabilities?.supportedSemanticCapabilities || [],
+    supported_commands: (r.agentCard?.supportedCommands || []).map((cmd) => ({
+      command: cmd.command,
+      example: cmd.example,
+      description: cmd.description,
+    })),
     relevance_score: r.relevanceScore,
   }));
 

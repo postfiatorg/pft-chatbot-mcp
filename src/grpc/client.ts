@@ -34,25 +34,42 @@ export interface StoreEnvelopeResponse {
   metadata: Record<string, string>;
 }
 
+export interface CommandDescriptor {
+  command: string;
+  example: string;
+  description: string;
+}
+
+export interface AgentCardData {
+  name: string;
+  description: string;
+  url: string;
+  version: string;
+  organization: string;
+  supportedCommands: CommandDescriptor[];
+}
+
+export interface AgentCapabilitiesData {
+  publicEncryptionKey: Buffer;
+  supportedSemanticCapabilities: string[];
+}
+
 export interface AgentSearchResult {
   agentId: string;
-  agentCard: {
-    name: string;
-    description: string;
-    url: string;
-    version: string;
-    organization: string;
-  };
-  keystoneCapabilities: {
-    publicEncryptionKey: Buffer;
-    supportedSemanticCapabilities: string[];
-  };
+  agentCard: AgentCardData;
+  keystoneCapabilities: AgentCapabilitiesData;
   relevanceScore: number;
 }
 
 export interface SearchAgentsResponse {
   results: AgentSearchResult[];
   totalCount: number;
+}
+
+export interface GetAgentCardResponse {
+  agentId: string;
+  agentCard: AgentCardData;
+  keystoneCapabilities: AgentCapabilitiesData;
 }
 
 export interface VerifyAndIssueKeyResponse {
@@ -233,6 +250,11 @@ export class KeystoneClient {
       description: string;
       url?: string;
       version?: string;
+      commands?: Array<{
+        command: string;
+        example: string;
+        description: string;
+      }>;
     },
     capabilities: {
       publicEncryptionKey: Buffer;
@@ -252,6 +274,11 @@ export class KeystoneClient {
           url: agentCard.url || "",
           version: agentCard.version || "1.0.0",
           organization: "",
+          supportedCommands: (agentCard.commands || []).map((cmd) => ({
+            command: cmd.command,
+            example: cmd.example,
+            description: cmd.description,
+          })),
         },
         keystoneCapabilities: {
           envelopeProcessing: true,
@@ -286,6 +313,22 @@ export class KeystoneClient {
       },
       this.authMetadata()
     );
+  }
+
+  async getAgentCard(agentId: string): Promise<GetAgentCardResponse> {
+    const call = promisify<any, GetAgentCardResponse>(
+      this.agentRegistry,
+      (this.agentRegistry as any).getAgentCard
+    );
+    return call({ agentId }, this.authMetadata());
+  }
+
+  async deleteAgentCard(agentId: string): Promise<{ deleted: boolean }> {
+    const call = promisify<any, { deleted: boolean }>(
+      this.agentRegistry,
+      (this.agentRegistry as any).deleteAgentCard
+    );
+    return call({ agentId }, this.authMetadata());
   }
 
   close(): void {

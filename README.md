@@ -8,7 +8,7 @@ This is a [Model Context Protocol](https://modelcontextprotocol.io/) server that
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| @postfiatorg/pft-chatbot-mcp | 0.1.0 | This package |
+| @postfiatorg/pft-chatbot-mcp | 0.2.0 | This package |
 | Keystone Protocol | v1 | Proto schema version |
 | pf.ptr Pointer | v4 | On-chain memo format |
 | Keystone gRPC server | >= 0.1.0 | Backend service |
@@ -239,7 +239,7 @@ Each attachment object: `{ cid: string, content_type: string, filename?: string 
 
 ### register_bot
 
-Registers the bot in the Keystone agent registry. On first call, performs an Ed25519 challenge-response to prove wallet ownership and provisions an API key.
+Registers or updates the bot in the Keystone agent registry. On first call, performs an Ed25519 challenge-response to prove wallet ownership and provisions an API key. Pass `agent_id` to update an existing registration.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -247,8 +247,20 @@ Registers the bot in the Keystone agent registry. On first call, performs an Ed2
 | `description` | `string` | **Yes** | - | Short description of what the bot does |
 | `capabilities` | `string[]` | **Yes** | - | Capability tags (e.g. `["text-generation", "image-generation"]`) |
 | `url` | `string` | No | - | Bot homepage or documentation URL |
+| `agent_id` | `string` | No | - | Existing agent ID to update (omit to create new) |
+| `commands` | `array` | No | - | Supported commands (see below) |
 
-**Returns**: JSON with `agent_id`, `wallet_address`, `name`, `capabilities`, `registered: true`.
+Each command object: `{ command: string, example: string, description: string }`
+
+**Example commands:**
+```json
+[
+  { "command": "/clarify", "example": "/clarify what is PFT", "description": "Used to ask questions about terms of use" },
+  { "command": "/summarize", "example": "/summarize last 5 messages", "description": "Summarize recent conversation history" }
+]
+```
+
+**Returns**: JSON with `agent_id`, `wallet_address`, `name`, `capabilities`, `supported_commands`, `registered: true` (or `updated: true` if `agent_id` was provided).
 
 ---
 
@@ -262,7 +274,31 @@ Searches the public agent registry for other bots by name, description, or capab
 | `capabilities` | `string[]` | No | - | Filter by capability tags |
 | `limit` | `number` | No | `20` | Max results (1-100) |
 
-**Returns**: JSON with `total_count` and `results` array, each containing `agent_id`, `name`, `description`, `wallet_address`, `capabilities`, `relevance_score`.
+**Returns**: JSON with `total_count` and `results` array, each containing `agent_id`, `name`, `description`, `wallet_address`, `capabilities`, `supported_commands`, `relevance_score`.
+
+---
+
+### get_bot
+
+Fetches a registered bot's full details by agent ID.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `agent_id` | `string` | **Yes** | - | The agent ID to look up |
+
+**Returns**: JSON with `agent_id`, `name`, `description`, `url`, `version`, `organization`, `capabilities`, `supported_commands`.
+
+---
+
+### delete_bot
+
+Deletes a bot's registration from the Keystone agent registry.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `agent_id` | `string` | **Yes** | - | The agent ID to delete |
+
+**Returns**: JSON with `agent_id`, `deleted: true/false`.
 
 ---
 
@@ -294,6 +330,38 @@ Fetches all messages in a conversation, either by thread ID or contact address. 
 *At least one of `thread_id` or `contact_address` must be provided.
 
 **Returns**: JSON with `thread_id`, `contact_address`, `message_count`, and chronologically sorted `messages` array. Each message includes `tx_hash`, `sender`, `recipient`, `direction`, `amount_drops`, `timestamp`, `cid`, and if decrypted: `message`, `content_type`.
+
+---
+
+### check_balance
+
+Checks the bot's wallet balance including native PFT and all trust line balances. No parameters needed.
+
+**Returns**: JSON with `wallet_address`, `native_balance` (`pft` and `drops`), `trust_lines` array (each with `currency`, `issuer`, `balance`, `limit`).
+
+---
+
+### send_pft
+
+Sends PFT to an address without attaching a message. Lightweight transfer for payments, tipping, and funding other wallets.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `recipient` | `string` | **Yes** | - | Destination PFTL r-address |
+| `amount_pft` | `string` | No* | - | PFT amount (e.g. `"10"`). Converted to drops automatically. |
+| `amount_drops` | `string` | No* | - | PFT in drops (1 PFT = 1,000,000 drops). Ignored if `amount_pft` is set. |
+
+*At least one of `amount_pft` or `amount_drops` must be provided.
+
+**Returns**: JSON with `tx_hash`, `result`, `recipient`, `amount_pft`, `amount_drops`, `fee_drops`.
+
+---
+
+### get_wallet_info
+
+Returns the bot's wallet address, public keys, encryption key, and trust line status. Useful for onboarding flows and debugging. No parameters needed.
+
+**Returns**: JSON with `wallet_address`, `public_signing_key`, `x25519_encryption_key`, `native_balance`, `pft_trust_line` (with `active` boolean), `all_trust_lines`, `chain_rpc`, `keystone_grpc`.
 
 ## Bot Lifecycle
 
@@ -437,24 +505,16 @@ src/
     ├── scan_messages.ts   # scan_messages tool
     ├── get_message.ts     # get_message tool
     ├── send_message.ts    # send_message tool
-    ├── register_bot.ts    # register_bot tool
+    ├── register_bot.ts    # register_bot / update_bot tool
     ├── search_bots.ts     # search_bots tool
+    ├── get_bot.ts         # get_bot tool
+    ├── delete_bot.ts      # delete_bot tool
     ├── upload_content.ts  # upload_content tool
-    └── get_thread.ts      # get_thread tool
+    ├── get_thread.ts      # get_thread tool
+    ├── check_balance.ts   # check_balance tool
+    ├── send_pft.ts        # send_pft tool
+    └── get_wallet_info.ts # get_wallet_info tool
 ```
-
-## TODO
-
-- [ ] **Bot update support**: Pass `agent_id` through the `register_bot` tool (or add a dedicated `update_bot` tool) so bot descriptions, capabilities, and metadata can be updated after initial registration. The gRPC client already accepts an optional `agentId` parameter, but `register_bot` never passes it.
-- [ ] **Implement missing registry client methods**: Add client wrappers for `GetAgentCard` and `DeleteAgentCard` RPCs (defined in the proto but not yet implemented in `client.ts`).
-- [ ] **Supported commands with descriptions**: Add a list of supported commands (with descriptions) to the bot registry schema. This involves:
-  - Adding a new `repeated` field (e.g., `CommandDescriptor`) to `SimpleAgentCard` in the proto
-  - Adding a corresponding column (e.g., `supported_commands JSONB DEFAULT '[]'`) or relation table in the Keystone PostgreSQL schema
-  - Exposing the commands list in `register_bot` / `update_bot` tool params
-  - This is a non-breaking, additive change on both the protobuf and Postgres sides -- existing bots will default to an empty commands list.
-- [ ] **`check_balance` tool**: Query the bot's wallet balance (PFT and any issued currencies). Basic housekeeping tool so the bot/operator can verify funds without leaving the MCP client.
-- [ ] **`send_pft` tool**: Send PFT to an address without attaching a message. Currently the only way to transfer PFT is via `send_message`, which always encrypts and uploads to IPFS. A lightweight `send_pft` tool would support simple payments, tipping, and funding other wallets.
-- [ ] **`get_wallet_info` tool**: Return the bot's wallet address, public key, and trust line status. Useful for onboarding flows and debugging connectivity issues.
 
 ## FAQ
 

@@ -23,11 +23,16 @@ import {
   executeRegisterBot,
 } from "./tools/register_bot.js";
 import { searchBotsSchema, executeSearchBots } from "./tools/search_bots.js";
+import { getBotSchema, executeGetBot } from "./tools/get_bot.js";
+import { deleteBotSchema, executeDeleteBot } from "./tools/delete_bot.js";
 import {
   uploadContentSchema,
   executeUploadContent,
 } from "./tools/upload_content.js";
 import { getThreadSchema, executeGetThread } from "./tools/get_thread.js";
+import { executeCheckBalance } from "./tools/check_balance.js";
+import { sendPftSchema, executeSendPft } from "./tools/send_pft.js";
+import { executeGetWalletInfo } from "./tools/get_wallet_info.js";
 
 async function main() {
   // Try to load configuration -- if BOT_SEED is not set, the server starts
@@ -149,12 +154,14 @@ async function main() {
 
     server.tool(
       "register_bot",
-      "Register this bot in the Keystone agent registry with a name, description, and capabilities. Auto-provisions an API key on first use.",
+      "Register or update this bot in the Keystone agent registry. Pass agent_id to update an existing registration. Auto-provisions an API key on first use.",
       {
         name: registerBotSchema.shape.name,
         description: registerBotSchema.shape.description,
         capabilities: registerBotSchema.shape.capabilities,
         url: registerBotSchema.shape.url,
+        agent_id: registerBotSchema.shape.agent_id,
+        commands: registerBotSchema.shape.commands,
       },
       async (params) => {
         try {
@@ -185,6 +192,44 @@ async function main() {
       async (params) => {
         try {
           const result = await executeSearchBots(config, grpcClient, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return {
+            content: [{ type: "text", text: `Error: ${err.message}` }],
+            isError: true,
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "get_bot",
+      "Get a registered bot's full details by agent ID, including supported commands.",
+      {
+        agent_id: getBotSchema.shape.agent_id,
+      },
+      async (params) => {
+        try {
+          const result = await executeGetBot(config, grpcClient, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return {
+            content: [{ type: "text", text: `Error: ${err.message}` }],
+            isError: true,
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "delete_bot",
+      "Delete a bot's registration from the Keystone agent registry.",
+      {
+        agent_id: deleteBotSchema.shape.agent_id,
+      },
+      async (params) => {
+        try {
+          const result = await executeDeleteBot(config, grpcClient, params);
           return { content: [{ type: "text", text: result }] };
         } catch (err: any) {
           return {
@@ -232,6 +277,61 @@ async function main() {
       async (params) => {
         try {
           const result = await executeGetThread(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return {
+            content: [{ type: "text", text: `Error: ${err.message}` }],
+            isError: true,
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "check_balance",
+      "Check the bot's wallet balance including native PFT and trust line balances.",
+      {},
+      async () => {
+        try {
+          const result = await executeCheckBalance(config, keypair);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return {
+            content: [{ type: "text", text: `Error: ${err.message}` }],
+            isError: true,
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "send_pft",
+      "Send PFT to an address without attaching a message. Lightweight transfer for payments, tipping, and funding other wallets.",
+      {
+        recipient: sendPftSchema.shape.recipient,
+        amount_pft: sendPftSchema.shape.amount_pft,
+        amount_drops: sendPftSchema.shape.amount_drops,
+      },
+      async (params) => {
+        try {
+          const result = await executeSendPft(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return {
+            content: [{ type: "text", text: `Error: ${err.message}` }],
+            isError: true,
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "get_wallet_info",
+      "Return the bot's wallet address, public key, encryption key, and trust line status. Useful for onboarding and debugging.",
+      {},
+      async () => {
+        try {
+          const result = await executeGetWalletInfo(config, keypair);
           return { content: [{ type: "text", text: result }] };
         } catch (err: any) {
           return {

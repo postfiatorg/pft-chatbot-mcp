@@ -14,6 +14,24 @@ export const registerBotSchema = z.object({
       'Semantic capability URIs (e.g., ["text-summarization", "image-generation"])'
     ),
   url: z.string().optional().describe("Bot homepage or documentation URL"),
+  agent_id: z
+    .string()
+    .optional()
+    .describe(
+      "Existing agent ID to update. If omitted, a new registration is created."
+    ),
+  commands: z
+    .array(
+      z.object({
+        command: z.string().describe('Command string, e.g. "/clarify"'),
+        example: z
+          .string()
+          .describe('Usage example, e.g. "/clarify what is PFT"'),
+        description: z.string().describe("What the command does"),
+      })
+    )
+    .optional()
+    .describe("Supported commands with descriptions"),
 });
 
 export type RegisterBotParams = z.infer<typeof registerBotSchema>;
@@ -61,20 +79,24 @@ export async function executeRegisterBot(
       name: params.name,
       description: params.description,
       url: params.url,
+      commands: params.commands,
     },
     {
       publicEncryptionKey: Buffer.from(keypair.x25519PublicKey),
       supportedSemanticCapabilities: capabilities,
-    }
+    },
+    params.agent_id
   );
 
+  const isUpdate = !!params.agent_id;
   return JSON.stringify(
     {
       agent_id: result.agentId,
       wallet_address: keypair.address,
       name: params.name,
       capabilities,
-      registered: true,
+      supported_commands: params.commands || [],
+      [isUpdate ? "updated" : "registered"]: true,
     },
     null,
     2

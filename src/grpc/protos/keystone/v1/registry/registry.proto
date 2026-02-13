@@ -24,6 +24,14 @@ message KeystoneAgentCapabilities {
   map<string, string> identity_attestations = 10;
 }
 
+// Describes a command the bot supports, surfaced in the FE as a table:
+//   command | example | description
+message CommandDescriptor {
+  string command = 1;      // e.g. "/clarify"
+  string example = 2;      // e.g. "/clarify what is PFT"
+  string description = 3;  // e.g. "Used to ask questions about terms of use"
+}
+
 // Simplified AgentCard (flattened from A2A for client use)
 message SimpleAgentCard {
   string name = 1;
@@ -31,6 +39,7 @@ message SimpleAgentCard {
   string url = 3;
   string version = 4;
   string organization = 5;
+  repeated CommandDescriptor supported_commands = 6;
 }
 
 service KeystoneAgentRegistryService {

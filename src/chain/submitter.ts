@@ -28,7 +28,7 @@ export type PftlAmount =
   | { currency: string; issuer: string; value: string };
 
 /**
- * Prepare a Payment transaction with a memo (pointer or envelope).
+ * Prepare a Payment transaction with an optional memo (pointer or envelope).
  * Supports both PFT drop amounts (string) and issued currency amounts (object).
  * Returns the autofilled, unsigned transaction JSON.
  */
@@ -37,7 +37,7 @@ export async function preparePayment(
   wallet: Wallet,
   destination: string,
   amount: PftlAmount,
-  memo: {
+  memo?: {
     memoTypeHex: string;
     memoFormatHex: string;
     memoDataHex: string;
@@ -49,7 +49,10 @@ export async function preparePayment(
       Account: wallet.address,
       Destination: destination,
       Amount: amount || "1",
-      Memos: [
+    };
+
+    if (memo) {
+      payment.Memos = [
         {
           Memo: {
             MemoType: memo.memoTypeHex,
@@ -57,8 +60,8 @@ export async function preparePayment(
             MemoData: memo.memoDataHex,
           },
         },
-      ],
-    };
+      ];
+    }
 
     const prepared = await client.autofill(payment);
 

@@ -233,3 +233,44 @@ export async function getAccountInfo(
     messageKey: data?.MessageKey,
   };
 }
+
+/** A single trust line returned by account_lines */
+export interface TrustLine {
+  currency: string;
+  issuer: string;
+  balance: string;
+  limit: string;
+}
+
+/**
+ * Fetch account_lines for a wallet address.
+ * Returns the list of trust lines (issued currency balances and limits).
+ */
+export async function getAccountLines(
+  rpcUrl: string,
+  address: string
+): Promise<TrustLine[]> {
+  const response = await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      method: "account_lines",
+      params: [{ account: address }],
+    }),
+  });
+
+  const json = (await response.json()) as any;
+  if (json.result?.error) {
+    throw new Error(
+      `account_lines error: ${json.result.error_message || json.result.error}`
+    );
+  }
+
+  const lines = json.result?.lines || [];
+  return lines.map((line: any) => ({
+    currency: line.currency || "",
+    issuer: line.account || "",
+    balance: line.balance || "0",
+    limit: line.limit || "0",
+  }));
+}

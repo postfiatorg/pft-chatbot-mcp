@@ -1,6 +1,6 @@
 {
   "name": "@postfiatorg/pft-chatbot-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server for enabling chatbots to work within Post Fiat Task Node Messages UI",
   "type": "module",
   "main": "dist/index.js",
