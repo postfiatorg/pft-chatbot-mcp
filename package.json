@@ -23,11 +23,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/PostFiat/pft-chatbot-mcp.git"
+    "url": "git+https://github.com/postfiatorg/pft-chatbot-mcp.git"
   },
-  "homepage": "https://github.com/PostFiat/pft-chatbot-mcp#readme",
+  "homepage": "https://github.com/postfiatorg/pft-chatbot-mcp#readme",
   "bugs": {
-    "url": "https://github.com/PostFiat/pft-chatbot-mcp/issues"
+    "url": "https://github.com/postfiatorg/pft-chatbot-mcp/issues"
   },
   "keywords": [
     "mcp",
