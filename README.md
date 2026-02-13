@@ -443,6 +443,16 @@ src/
     └── get_thread.ts      # get_thread tool
 ```
 
+## TODO
+
+- [ ] **Bot update support**: Pass `agent_id` through the `register_bot` tool (or add a dedicated `update_bot` tool) so bot descriptions, capabilities, and metadata can be updated after initial registration. The gRPC client already accepts an optional `agentId` parameter, but `register_bot` never passes it.
+- [ ] **Implement missing registry client methods**: Add client wrappers for `GetAgentCard` and `DeleteAgentCard` RPCs (defined in the proto but not yet implemented in `client.ts`).
+- [ ] **Supported commands with descriptions**: Add a list of supported commands (with descriptions) to the bot registry schema. This involves:
+  - Adding a new `repeated` field (e.g., `CommandDescriptor`) to `SimpleAgentCard` in the proto
+  - Adding a corresponding column (e.g., `supported_commands JSONB DEFAULT '[]'`) or relation table in the Keystone PostgreSQL schema
+  - Exposing the commands list in `register_bot` / `update_bot` tool params
+  - This is a non-breaking, additive change on both the protobuf and Postgres sides -- existing bots will default to an empty commands list.
+
 ## FAQ
 
 **Q: Do I need to run my own IPFS node?**
