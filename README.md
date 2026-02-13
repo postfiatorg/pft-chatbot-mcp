@@ -24,12 +24,12 @@ Bot Operator's Machine                  Post Fiat Infrastructure
 ┌──────────────────────────┐            ┌─────────────────────────┐
 │  LLM Client              │            │ Keystone gRPC Service   │
 │  (Cursor, Claude, etc.)  │            │  ┌───────────────────┐  │
-│     │                    │            │  │ IPFS write gate    │  │
-│     │ MCP protocol       │            │  │ Agent registry     │  │
-│     │ (stdio)            │            │  │ Envelope storage   │  │
-│     ▼                    │   gRPC     │  │ Auth + rate limits │  │
+│     │                    │            │  │ IPFS write gate   │  │
+│     │ MCP protocol       │            │  │ Agent registry    │  │
+│     │ (stdio)            │            │  │ Envelope storage  │  │
+│     ▼                    │   gRPC     │  │ Auth + rate limits│  │
 │  ┌──────────────────┐    │◄──────────►│  └───────────────────┘  │
-│  │ pft-chatbot-mcp  │    │   TLS     │                         │
+│  │ pft-chatbot-mcp  │    │   TLS      │                         │
 │  │                  │    │            │  ┌───────────────────┐  │
 │  │ • Signs txs      │    │            │  │ PostgreSQL        │  │
 │  │ • Decrypts msgs  │    │            │  └───────────────────┘  │
@@ -65,8 +65,7 @@ Messages use the same encryption scheme as the pftasks frontend:
 ### 1. Prerequisites
 
 - Node.js >= 20
-- A PFTL wallet with a **PFT trust line** (required for API key provisioning)
-- Your wallet's seed (family seed like `sEdXXX` or hex)
+- An MCP-compatible LLM client (Cursor, Claude Desktop, etc.)
 
 ### 2. Install
 
@@ -84,7 +83,9 @@ npm install
 
 ### 3. Configure Your LLM Client
 
-Copy `mcp.json.example` to your LLM client's MCP configuration location and fill in your bot seed.
+Copy `mcp.json.example` to your LLM client's MCP configuration location.
+
+**If you already have a wallet**, add your seed:
 
 **For Cursor** (`.cursor/mcp.json`):
 ```json
@@ -116,11 +117,27 @@ Copy `mcp.json.example` to your LLM client's MCP configuration location and fill
 }
 ```
 
-That's it -- all other configuration has sensible testnet defaults. See [Environment Variables](#environment-variables) for advanced overrides.
+**If you don't have a wallet yet**, omit the `BOT_SEED` line -- the server will start in setup mode with the `create_wallet` tool available. See [Wallet Setup](#wallet-setup) below.
 
-### 4. First Run
+All other configuration has sensible testnet defaults. See [Environment Variables](#environment-variables) for advanced overrides.
 
-Once configured, tell your LLM:
+### 4. Wallet Setup
+
+If you need a new wallet, the server can start without a seed. Tell your LLM:
+
+> "Create a new PFTL wallet for my bot"
+
+This calls `create_wallet` and returns your new wallet address and seed. Then:
+
+1. **Save the seed securely** (it's shown once and is the only way to access the wallet)
+2. **Deposit at least 10 PFT** to the wallet address to activate it on-chain (via the [pftasks UI](https://tasknode.postfiat.org) or another wallet)
+3. **Add the seed** to your MCP configuration as `BOT_SEED` and restart
+
+For a detailed walkthrough, see **[docs/WALLET_SETUP.md](docs/WALLET_SETUP.md)**.
+
+### 5. First Run
+
+Once your wallet is configured and activated, tell your LLM:
 
 > "Register my bot as 'My Bot' with description 'A helpful assistant' and capabilities ['text-generation']"
 
@@ -136,6 +153,23 @@ Then try:
 For a complete working example with tiered responses (text + image based on PFT amount), see **[docs/HELLO_WORLD_BOT.md](docs/HELLO_WORLD_BOT.md)**.
 
 ## Tools Reference
+
+### create_wallet
+
+Generates a new PFTL wallet locally. No network connection is required. The wallet must receive a deposit of at least **10 PFT** before it is active on-chain.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `algorithm` | `string` | No | `"ed25519"` | Key algorithm: `"ed25519"` (recommended) or `"secp256k1"` |
+
+**Returns**: JSON with `address` (the r-address), `seed` (family seed -- save this!), `public_key`, `key_algorithm`, activation instructions, and next steps.
+
+**Important**:
+- The seed is displayed once. Copy and store it securely before doing anything else.
+- The wallet does not exist on-chain until it receives at least 10 PFT.
+- This tool is available even when no `BOT_SEED` is configured (setup mode).
+
+---
 
 ### scan_messages
 
@@ -264,6 +298,12 @@ Fetches all messages in a conversation, either by thread ID or contact address. 
 ## Bot Lifecycle
 
 ```
+┌──────────────┐
+│ create_wallet │  Generate a new wallet (if you don't have one)
+│ (optional)    │
+└──────┬───────┘
+       │  deposit ≥ 10 PFT, configure BOT_SEED, restart
+       ▼
 ┌─────────────┐
 │  register    │  Prove wallet ownership, get API key, register in directory
 │  (once)      │
@@ -393,6 +433,7 @@ src/
 ├── ipfs/
 │   └── gateway.ts        # Direct IPFS gateway reads
 └── tools/
+    ├── create_wallet.ts   # create_wallet tool (no seed required)
     ├── scan_messages.ts   # scan_messages tool
     ├── get_message.ts     # get_message tool
     ├── send_message.ts    # send_message tool
@@ -413,8 +454,8 @@ PFTL, a standalone blockchain with PFT as its native currency. It uses the same 
 **Q: Can I use this with Claude Desktop / other MCP clients?**
 Yes. Any MCP-compatible client that supports stdio transport works. See the configuration examples above.
 
-**Q: How do I get a PFTL wallet with a PFT trust line?**
-Use the pftasks UI to create a wallet, or generate one programmatically using the `xrpl` npm package (PFTL uses the same wallet format).
+**Q: How do I get a PFTL wallet?**
+Use the `create_wallet` tool -- it works even without an existing seed. Start the MCP server without `BOT_SEED` and tell your LLM to create a wallet. You'll get a new address and seed. Then deposit at least 10 PFT to activate it (via [pftasks](https://tasknode.postfiat.org) or from another wallet), set the seed in your config, and restart. See [docs/WALLET_SETUP.md](docs/WALLET_SETUP.md) for a full walkthrough.
 
 **Q: How much does it cost to send a message?**
 Each message is a Payment transaction on the PFTL chain, which costs a small amount of PFT in fees (typically < 0.001 PFT). The `amount_pft` parameter controls how much PFT to include in the payment itself, or use `amount_drops` for fine control (1 PFT = 1,000,000 drops, default: 1 drop).
