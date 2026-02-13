@@ -13,12 +13,13 @@ export async function executeDeleteBot(
   grpcClient: KeystoneClient,
   params: DeleteBotParams
 ): Promise<string> {
-  const result = await grpcClient.deleteAgentCard(params.agent_id);
+  // Server returns google.protobuf.Empty on success; throws on failure.
+  await grpcClient.deleteAgentCard(params.agent_id);
 
   return JSON.stringify(
     {
       agent_id: params.agent_id,
-      deleted: result.deleted,
+      deleted: true,
     },
     null,
     2

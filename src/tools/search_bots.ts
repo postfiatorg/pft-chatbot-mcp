@@ -50,7 +50,8 @@ export async function executeSearchBots(
     wallet_address: "",
     capabilities:
       r.keystoneCapabilities?.supportedSemanticCapabilities || [],
-    supported_commands: (r.agentCard?.supportedCommands || []).map((cmd) => ({
+    // supported_commands is a top-level field on the search result, NOT inside agentCard
+    supported_commands: (r.supportedCommands || []).map((cmd) => ({
       command: cmd.command,
       example: cmd.example,
       description: cmd.description,

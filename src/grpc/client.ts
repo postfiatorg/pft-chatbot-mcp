@@ -40,13 +40,17 @@ export interface CommandDescriptor {
   description: string;
 }
 
+export interface AgentProviderData {
+  url: string;
+  organization: string;
+}
+
 export interface AgentCardData {
   name: string;
   description: string;
   url: string;
+  provider: AgentProviderData;
   version: string;
-  organization: string;
-  supportedCommands: CommandDescriptor[];
 }
 
 export interface AgentCapabilitiesData {
@@ -59,6 +63,7 @@ export interface AgentSearchResult {
   agentCard: AgentCardData;
   keystoneCapabilities: AgentCapabilitiesData;
   relevanceScore: number;
+  supportedCommands: CommandDescriptor[];
 }
 
 export interface SearchAgentsResponse {
@@ -66,10 +71,14 @@ export interface SearchAgentsResponse {
   totalCount: number;
 }
 
-export interface GetAgentCardResponse {
-  agentId: string;
+export interface StoreAgentCardResponse {
   agentCard: AgentCardData;
-  keystoneCapabilities: AgentCapabilitiesData;
+  supportedCommands: CommandDescriptor[];
+}
+
+export interface GetAgentCardResponse {
+  agentCard: AgentCardData;
+  supportedCommands: CommandDescriptor[];
 }
 
 export interface VerifyAndIssueKeyResponse {
@@ -250,19 +259,20 @@ export class KeystoneClient {
       description: string;
       url?: string;
       version?: string;
-      commands?: Array<{
-        command: string;
-        example: string;
-        description: string;
-      }>;
+      organization?: string;
     },
     capabilities: {
       publicEncryptionKey: Buffer;
       supportedSemanticCapabilities: string[];
     },
+    commands?: Array<{
+      command: string;
+      example: string;
+      description: string;
+    }>,
     agentId?: string
-  ): Promise<{ agentId: string }> {
-    const call = promisify<any, any>(
+  ): Promise<StoreAgentCardResponse> {
+    const call = promisify<any, StoreAgentCardResponse>(
       this.agentRegistry,
       (this.agentRegistry as any).storeAgentCard
     );
@@ -272,13 +282,10 @@ export class KeystoneClient {
           name: agentCard.name,
           description: agentCard.description,
           url: agentCard.url || "",
+          provider: {
+            organization: agentCard.organization || "",
+          },
           version: agentCard.version || "1.0.0",
-          organization: "",
-          supportedCommands: (agentCard.commands || []).map((cmd) => ({
-            command: cmd.command,
-            example: cmd.example,
-            description: cmd.description,
-          })),
         },
         keystoneCapabilities: {
           envelopeProcessing: true,
@@ -290,6 +297,12 @@ export class KeystoneClient {
           supportedEncryptionModes: ["ENCRYPTION_MODE_PUBLIC_KEY"],
         },
         agentId: agentId || "",
+        // supported_commands is a top-level field on the request, NOT inside agentCard
+        supportedCommands: (commands || []).map((cmd) => ({
+          command: cmd.command,
+          example: cmd.example,
+          description: cmd.description,
+        })),
       },
       this.authMetadata()
     );
@@ -323,8 +336,8 @@ export class KeystoneClient {
     return call({ agentId }, this.authMetadata());
   }
 
-  async deleteAgentCard(agentId: string): Promise<{ deleted: boolean }> {
-    const call = promisify<any, { deleted: boolean }>(
+  async deleteAgentCard(agentId: string): Promise<Record<string, never>> {
+    const call = promisify<any, Record<string, never>>(
       this.agentRegistry,
       (this.agentRegistry as any).deleteAgentCard
     );

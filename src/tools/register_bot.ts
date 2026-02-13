@@ -79,23 +79,26 @@ export async function executeRegisterBot(
       name: params.name,
       description: params.description,
       url: params.url,
-      commands: params.commands,
     },
     {
       publicEncryptionKey: Buffer.from(keypair.x25519PublicKey),
       supportedSemanticCapabilities: capabilities,
     },
+    params.commands,
     params.agent_id
   );
 
+  // agent_id is not returned by the server in StoreAgentCardResponse;
+  // for updates we echo back the input, for new registrations we note it's
+  // server-assigned (the wallet address is the canonical identifier).
   const isUpdate = !!params.agent_id;
   return JSON.stringify(
     {
-      agent_id: result.agentId,
+      agent_id: params.agent_id || keypair.address,
       wallet_address: keypair.address,
       name: params.name,
       capabilities,
-      supported_commands: params.commands || [],
+      supported_commands: result.supportedCommands || params.commands || [],
       [isUpdate ? "updated" : "registered"]: true,
     },
     null,

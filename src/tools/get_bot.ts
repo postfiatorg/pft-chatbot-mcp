@@ -15,7 +15,8 @@ export async function executeGetBot(
 ): Promise<string> {
   const result = await grpcClient.getAgentCard(params.agent_id);
 
-  const commands = (result.agentCard?.supportedCommands || []).map((cmd) => ({
+  // supported_commands is a top-level response field, NOT inside agentCard
+  const commands = (result.supportedCommands || []).map((cmd) => ({
     command: cmd.command,
     example: cmd.example,
     description: cmd.description,
@@ -23,14 +24,12 @@ export async function executeGetBot(
 
   return JSON.stringify(
     {
-      agent_id: result.agentId,
+      agent_id: params.agent_id,
       name: result.agentCard?.name || "",
       description: result.agentCard?.description || "",
       url: result.agentCard?.url || "",
       version: result.agentCard?.version || "",
-      organization: result.agentCard?.organization || "",
-      capabilities:
-        result.keystoneCapabilities?.supportedSemanticCapabilities || [],
+      organization: result.agentCard?.provider?.organization || "",
       supported_commands: commands,
     },
     null,

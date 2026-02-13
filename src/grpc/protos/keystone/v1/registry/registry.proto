@@ -3,7 +3,8 @@ package keystone.v1.registry;
 
 import "keystone/v1/core/envelope.proto";
 
-// Simplified for MCP client -- no A2A imports, flattened AgentCard
+// Simplified for MCP client -- field numbers MUST match a2a.v1.AgentCard on the
+// Keystone server so that the wire-format bytes are compatible.
 
 enum PublicKeyAlgorithm {
   PUBLIC_KEY_ALGORITHM_UNSPECIFIED = 0;
@@ -32,14 +33,27 @@ message CommandDescriptor {
   string description = 3;  // e.g. "Used to ask questions about terms of use"
 }
 
-// Simplified AgentCard (flattened from A2A for client use)
+// Service provider information (matches a2a.v1.AgentProvider field layout).
+message AgentProvider {
+  string url = 1;
+  string organization = 2;
+}
+
+// Simplified AgentCard -- field numbers MUST match a2a.v1.AgentCard.
+// Only the fields the MCP client uses are declared; the rest are skipped.
+//
+// a2a.v1.AgentCard wire layout (for reference):
+//   1 = name (string), 2 = description (string), 3 = url (string),
+//   4 = provider (AgentProvider), 5 = version (string),
+//   6 = documentation_url (string), 7+ = capabilities, security, skills ...
 message SimpleAgentCard {
   string name = 1;
   string description = 2;
   string url = 3;
-  string version = 4;
-  string organization = 5;
-  repeated CommandDescriptor supported_commands = 6;
+  AgentProvider provider = 4;   // was: string version = 4  (WRONG -- caused crash)
+  string version = 5;           // was: string organization = 5
+  // Field 6 is documentation_url in a2a -- NOT supported_commands.
+  // supported_commands lives on the request/response, not inside the card.
 }
 
 service KeystoneAgentRegistryService {
@@ -49,26 +63,32 @@ service KeystoneAgentRegistryService {
   rpc DeleteAgentCard(KeystoneDeleteAgentCardRequest) returns (KeystoneDeleteAgentCardResponse);
 }
 
+// --- Store ---
+
 message KeystoneStoreAgentCardRequest {
   SimpleAgentCard agent_card = 1;
   KeystoneAgentCapabilities keystone_capabilities = 2;
   string agent_id = 3;
+  repeated CommandDescriptor supported_commands = 4;  // top-level, NOT inside agent_card
 }
 
 message KeystoneStoreAgentCardResponse {
-  string agent_id = 1;
-  SimpleAgentCard agent_card = 2;
+  SimpleAgentCard agent_card = 1;
+  repeated CommandDescriptor supported_commands = 2;
 }
+
+// --- Get ---
 
 message KeystoneGetAgentCardRequest {
   string agent_id = 1;
 }
 
 message KeystoneGetAgentCardResponse {
-  string agent_id = 1;
-  SimpleAgentCard agent_card = 2;
-  KeystoneAgentCapabilities keystone_capabilities = 3;
+  SimpleAgentCard agent_card = 1;
+  repeated CommandDescriptor supported_commands = 2;
 }
+
+// --- Search ---
 
 message KeystoneSearchAgentsRequest {
   string query = 1;
@@ -88,12 +108,16 @@ message KeystoneAgentSearchResult {
   SimpleAgentCard agent_card = 2;
   KeystoneAgentCapabilities keystone_capabilities = 3;
   float relevance_score = 4;
+  repeated CommandDescriptor supported_commands = 5;
 }
+
+// --- Delete ---
 
 message KeystoneDeleteAgentCardRequest {
   string agent_id = 1;
 }
 
+// Server returns google.protobuf.Empty; keep a minimal response message
+// so proto-loader has something to deserialize (empty message is compatible).
 message KeystoneDeleteAgentCardResponse {
-  bool deleted = 1;
 }
