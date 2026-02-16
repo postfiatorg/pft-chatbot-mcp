@@ -8,7 +8,7 @@ This is a [Model Context Protocol](https://modelcontextprotocol.io/) server that
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| @postfiatorg/pft-chatbot-mcp | 0.2.8 | This package |
+| @postfiatorg/pft-chatbot-mcp | 0.2.9 | This package |
 | Keystone Protocol | v1 | Proto schema version |
 | pf.ptr Pointer | v4 | On-chain memo format |
 | Keystone gRPC server | >= 0.2.0 | Backend service |

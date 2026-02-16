@@ -133,7 +133,14 @@ export async function decodeKeystoneEnvelope(
 ): Promise<DecodedKeystoneEnvelope> {
   await loadProtos();
   const bytes = Buffer.from(memoDataHex, "hex");
-  const decoded = keystoneEnvelopeType!.decode(bytes) as any;
+  const raw = keystoneEnvelopeType!.decode(bytes);
+
+  // Convert to plain object with enum values as strings (e.g. encryption=3 -> "ENCRYPTION_MODE_PUBLIC_KEY").
+  const decoded = keystoneEnvelopeType!.toObject(raw, {
+    enums: String,
+    defaults: true,
+    bytes: Buffer,
+  }) as any;
 
   return {
     type: "keystone",
@@ -174,10 +181,18 @@ export async function buildPfPointerMemo(input: {
 }> {
   await loadProtos();
 
+  // Resolve enum string names to numeric values.
+  // protobufjs verify/create expect numbers for enum fields, not strings.
+  const targetEnum = pfPointerType!.parent!.lookupEnum("Target");
+  const kindEnum = pfPointerType!.root.lookupEnum("pf.common.v4.ContentKind");
+
+  const kindStr = input.kind || "CHAT";
+  const targetStr = "TARGET_CONTENT_BLOB";
+
   const payload: any = {
     cid: input.cid,
-    target: "TARGET_CONTENT_BLOB",
-    kind: input.kind || "CHAT",
+    target: targetEnum.values[targetStr] ?? 1,
+    kind: kindEnum.values[kindStr] ?? 4,
     schema: input.schema || 1,
     threadId: input.threadId || "",
     contextId: input.contextId || "",
