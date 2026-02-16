@@ -1,4 +1,4 @@
-import { Client, Wallet } from "xrpl";
+import { Wallet } from "xrpl";
 import type { Config } from "../config.js";
 
 export interface PreparedTransaction {
@@ -6,108 +6,14 @@ export interface PreparedTransaction {
   fee: string;
 }
 
-/**
- * Connect to the PFTL WebSocket endpoint, perform an operation, then disconnect.
- */
-async function withClient<T>(
-  wssUrl: string,
-  fn: (client: Client) => Promise<T>
-): Promise<T> {
-  const client = new Client(wssUrl);
-  await client.connect();
-  try {
-    return await fn(client);
-  } finally {
-    await client.disconnect();
-  }
-}
-
 /** PFTL Amount: either PFT drops (string) or issued currency (object) */
 export type PftlAmount =
   | string
   | { currency: string; issuer: string; value: string };
 
-/**
- * Prepare a Payment transaction with an optional memo (pointer or envelope).
- * Supports both PFT drop amounts (string) and issued currency amounts (object).
- * Returns the autofilled, unsigned transaction JSON.
- */
-export async function preparePayment(
-  config: Config,
-  wallet: Wallet,
-  destination: string,
-  amount: PftlAmount,
-  memo?: {
-    memoTypeHex: string;
-    memoFormatHex: string;
-    memoDataHex: string;
-  }
-): Promise<PreparedTransaction> {
-  return withClient(config.pftlWssUrl, async (client) => {
-    const payment: any = {
-      TransactionType: "Payment",
-      Account: wallet.address,
-      Destination: destination,
-      Amount: amount || "1",
-    };
-
-    if (memo) {
-      payment.Memos = [
-        {
-          Memo: {
-            MemoType: memo.memoTypeHex,
-            MemoFormat: memo.memoFormatHex,
-            MemoData: memo.memoDataHex,
-          },
-        },
-      ];
-    }
-
-    const prepared = await client.autofill(payment);
-
-    // Apply LastLedgerSequence buffer (at least 120 ledgers)
-    const serverInfo = await client.request({ command: "server_info" });
-    const validatedSeq =
-      serverInfo.result?.info?.validated_ledger?.seq;
-    if (validatedSeq && prepared.LastLedgerSequence) {
-      const minLls = validatedSeq + 120;
-      if (prepared.LastLedgerSequence < minLls) {
-        prepared.LastLedgerSequence = minLls;
-      }
-    }
-
-    return {
-      txJson: prepared,
-      fee: prepared.Fee || "12",
-    };
-  });
-}
-
-/**
- * Sign and submit a prepared transaction.
- * Returns the transaction hash.
- */
-export async function signAndSubmit(
-  config: Config,
-  wallet: Wallet,
-  txJson: any
-): Promise<{ txHash: string; result: string }> {
-  return withClient(config.pftlWssUrl, async (client) => {
-    const signed = wallet.sign(txJson);
-
-    const submitResult = await client.submitAndWait(signed.tx_blob, {
-      failHard: true,
-    });
-
-    const meta = submitResult.result?.meta as any;
-    const result = meta?.TransactionResult || "unknown";
-
-    return {
-      txHash: signed.hash,
-      result,
-    };
-  });
-}
+// ---------------------------------------------------------------------------
+// HTTP JSON-RPC helpers (no WebSocket dependency)
+// ---------------------------------------------------------------------------
 
 /**
  * Call a JSON-RPC method on the PFTL HTTP endpoint.
@@ -128,85 +34,74 @@ async function rpcCall(rpcUrl: string, method: string, params: any = {}): Promis
   return json.result;
 }
 
-/**
- * Publish the bot's X25519 encryption public key as the MessageKey on the PFTL ledger.
- * Uses HTTP JSON-RPC (no WebSocket dependency) for autofill, sign, submit, and poll.
- */
-export async function publishMessageKey(
-  config: Config,
-  wallet: Wallet,
-  messageKeyHex: string
-): Promise<{ txHash: string; result: string }> {
-  const rpcUrl = config.pftlRpcUrl;
+interface LedgerInfo {
+  sequence: number;
+  validatedSeq: number;
+  feeDrops: string;
+  networkId: number | undefined;
+}
 
-  // 1. Fetch account sequence
-  const accountInfo = await rpcCall(rpcUrl, "account_info", {
-    account: wallet.address,
-    ledger_index: "current",
-  });
+/**
+ * Fetch account sequence, validated ledger, base fee, and network ID
+ * from the PFTL HTTP RPC. Used to autofill transactions without WSS.
+ */
+async function fetchLedgerInfo(rpcUrl: string, account: string): Promise<LedgerInfo> {
+  const [accountInfo, serverInfo] = await Promise.all([
+    rpcCall(rpcUrl, "account_info", { account, ledger_index: "current" }),
+    rpcCall(rpcUrl, "server_info", {}),
+  ]);
+
   const sequence = accountInfo.account_data?.Sequence;
   if (sequence == null) {
     throw new Error("Could not read account Sequence from account_info");
   }
 
-  // 2. Fetch validated ledger + base fee + network ID from server_info
-  const serverInfo = await rpcCall(rpcUrl, "server_info", {});
   const info = serverInfo.info;
   const validatedSeq = info?.validated_ledger?.seq;
   const baseFee = info?.validated_ledger?.base_fee_xrp;
-  const networkId = info?.network_id;
   if (!validatedSeq) {
     throw new Error("Could not read validated_ledger from server_info");
   }
 
-  // 3. Build the AccountSet transaction
   const feeDrops = baseFee
     ? Math.ceil(parseFloat(baseFee) * 1_000_000).toString()
     : "12";
-  const lastLedgerSeq = validatedSeq + 120;
 
-  const txJson: any = {
-    TransactionType: "AccountSet",
-    Account: wallet.address,
-    MessageKey: messageKeyHex,
-    Fee: feeDrops,
-    Sequence: sequence,
-    LastLedgerSequence: lastLedgerSeq,
+  return {
+    sequence,
+    validatedSeq,
+    feeDrops,
+    networkId: info?.network_id,
   };
+}
 
-  // PFTL is a sidechain and requires NetworkID in transactions
-  if (networkId != null && networkId > 1024) {
-    txJson.NetworkID = networkId;
-  }
-
-  // 4. Sign locally
-  const signed = wallet.sign(txJson);
-
-  // 5. Submit via HTTP RPC
+/**
+ * Submit a signed transaction blob and poll until validated.
+ */
+async function submitAndPoll(
+  rpcUrl: string,
+  signedTxBlob: string,
+  txHash: string
+): Promise<{ txHash: string; result: string }> {
   const submitResult = await rpcCall(rpcUrl, "submit", {
-    tx_blob: signed.tx_blob,
+    tx_blob: signedTxBlob,
   });
 
   const engineResult = submitResult.engine_result;
   if (engineResult !== "tesSUCCESS" && engineResult !== "terQUEUED") {
-    return {
-      txHash: signed.hash,
-      result: engineResult || "unknown",
-    };
+    return { txHash, result: engineResult || "unknown" };
   }
 
-  // 6. Poll for validation
+  // Poll for validation
   const maxAttempts = 30;
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise((r) => setTimeout(r, 2000));
     try {
-      const txResult = await rpcCall(rpcUrl, "tx", {
-        transaction: signed.hash,
-      });
+      const txResult = await rpcCall(rpcUrl, "tx", { transaction: txHash });
       if (txResult.validated) {
         const meta = txResult.meta || {};
         return {
-          txHash: signed.hash,
+          txHash,
           result: meta.TransactionResult || engineResult || "tesSUCCESS",
         };
       }
@@ -216,9 +111,113 @@ export async function publishMessageKey(
   }
 
   return {
-    txHash: signed.hash,
+    txHash,
     result: `submitted (${engineResult}) but not yet validated after ${maxAttempts * 2}s`,
   };
+}
+
+/**
+ * Apply common autofill fields to a transaction: Sequence, Fee,
+ * LastLedgerSequence (with 120-ledger buffer), and NetworkID for sidechains.
+ */
+function applyAutofill(txJson: any, ledger: LedgerInfo): any {
+  txJson.Fee = ledger.feeDrops;
+  txJson.Sequence = ledger.sequence;
+  txJson.LastLedgerSequence = ledger.validatedSeq + 120;
+
+  // PFTL is a sidechain and requires NetworkID in transactions
+  if (ledger.networkId != null && ledger.networkId > 1024) {
+    txJson.NetworkID = ledger.networkId;
+  }
+
+  return txJson;
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * Prepare a Payment transaction with an optional memo (pointer or envelope).
+ * Supports both PFT drop amounts (string) and issued currency amounts (object).
+ * Returns the autofilled, unsigned transaction JSON.
+ *
+ * Uses HTTP JSON-RPC (no WebSocket dependency).
+ */
+export async function preparePayment(
+  config: Config,
+  wallet: Wallet,
+  destination: string,
+  amount: PftlAmount,
+  memo?: {
+    memoTypeHex: string;
+    memoFormatHex: string;
+    memoDataHex: string;
+  }
+): Promise<PreparedTransaction> {
+  const ledger = await fetchLedgerInfo(config.pftlRpcUrl, wallet.address);
+
+  const payment: any = {
+    TransactionType: "Payment",
+    Account: wallet.address,
+    Destination: destination,
+    Amount: amount || "1",
+  };
+
+  if (memo) {
+    payment.Memos = [
+      {
+        Memo: {
+          MemoType: memo.memoTypeHex,
+          MemoFormat: memo.memoFormatHex,
+          MemoData: memo.memoDataHex,
+        },
+      },
+    ];
+  }
+
+  applyAutofill(payment, ledger);
+
+  return {
+    txJson: payment,
+    fee: payment.Fee || "12",
+  };
+}
+
+/**
+ * Sign and submit a prepared transaction.
+ * Uses HTTP JSON-RPC with polling (no WebSocket dependency).
+ */
+export async function signAndSubmit(
+  config: Config,
+  wallet: Wallet,
+  txJson: any
+): Promise<{ txHash: string; result: string }> {
+  const signed = wallet.sign(txJson);
+  return submitAndPoll(config.pftlRpcUrl, signed.tx_blob, signed.hash);
+}
+
+/**
+ * Publish the bot's X25519 encryption public key as the MessageKey on the PFTL ledger.
+ * Uses HTTP JSON-RPC (no WebSocket dependency).
+ */
+export async function publishMessageKey(
+  config: Config,
+  wallet: Wallet,
+  messageKeyHex: string
+): Promise<{ txHash: string; result: string }> {
+  const ledger = await fetchLedgerInfo(config.pftlRpcUrl, wallet.address);
+
+  const txJson: any = {
+    TransactionType: "AccountSet",
+    Account: wallet.address,
+    MessageKey: messageKeyHex,
+  };
+
+  applyAutofill(txJson, ledger);
+
+  const signed = wallet.sign(txJson);
+  return submitAndPoll(config.pftlRpcUrl, signed.tx_blob, signed.hash);
 }
 
 /**
