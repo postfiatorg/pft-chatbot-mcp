@@ -81,16 +81,14 @@ export function identifyMemoType(
   memoTypeHex: string,
   memoFormatHex: string
 ): MemoType {
-  if (
-    memoTypeHex === PF_PTR_MEMO_TYPE_HEX &&
-    memoFormatHex === PF_PTR_MEMO_FORMAT_HEX
-  ) {
+  // XRPL nodes return hex in uppercase; normalize to lowercase for comparison.
+  const type = memoTypeHex.toLowerCase();
+  const fmt = memoFormatHex.toLowerCase();
+
+  if (type === PF_PTR_MEMO_TYPE_HEX && fmt === PF_PTR_MEMO_FORMAT_HEX) {
     return "pf.ptr";
   }
-  if (
-    memoTypeHex === KEYSTONE_MEMO_TYPE_HEX &&
-    memoFormatHex === KEYSTONE_MEMO_FORMAT_HEX
-  ) {
+  if (type === KEYSTONE_MEMO_TYPE_HEX && fmt === KEYSTONE_MEMO_FORMAT_HEX) {
     return "keystone";
   }
   return "unknown";

@@ -121,9 +121,11 @@ export async function scanMessages(
       const memo = memos[i]?.Memo;
       if (!memo?.MemoType || !memo?.MemoData) continue;
 
-      const memoTypeHex = memo.MemoType;
-      const memoFormatHex = memo.MemoFormat || "";
-      const memoDataHex = memo.MemoData;
+      // XRPL nodes return hex with uppercase letters; normalize to lowercase
+      // so identifyMemoType constants match.
+      const memoTypeHex = memo.MemoType.toLowerCase();
+      const memoFormatHex = (memo.MemoFormat || "").toLowerCase();
+      const memoDataHex = memo.MemoData.toLowerCase();
 
       const memoType = identifyMemoType(memoTypeHex, memoFormatHex);
       if (memoType === "unknown") continue;
