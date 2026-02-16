@@ -110,47 +110,115 @@ export async function signAndSubmit(
 }
 
 /**
+ * Call a JSON-RPC method on the PFTL HTTP endpoint.
+ */
+async function rpcCall(rpcUrl: string, method: string, params: any = {}): Promise<any> {
+  const resp = await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ method, params: [params] }),
+  });
+  if (!resp.ok) {
+    throw new Error(`RPC ${method} HTTP ${resp.status}: ${resp.statusText}`);
+  }
+  const json = (await resp.json()) as any;
+  if (json.result?.error) {
+    throw new Error(`RPC ${method}: ${json.result.error_message || json.result.error}`);
+  }
+  return json.result;
+}
+
+/**
  * Publish the bot's X25519 encryption public key as the MessageKey on the PFTL ledger.
- * This allows other wallets to resolve the bot's encryption key from on-chain data
- * so they can send encrypted messages.
+ * Uses HTTP JSON-RPC (no WebSocket dependency) for autofill, sign, submit, and poll.
  */
 export async function publishMessageKey(
   config: Config,
   wallet: Wallet,
   messageKeyHex: string
 ): Promise<{ txHash: string; result: string }> {
-  return withClient(config.pftlWssUrl, async (client) => {
-    const accountSet: any = {
-      TransactionType: "AccountSet",
-      Account: wallet.address,
-      MessageKey: messageKeyHex,
-    };
+  const rpcUrl = config.pftlRpcUrl;
 
-    const prepared = await client.autofill(accountSet);
+  // 1. Fetch account sequence
+  const accountInfo = await rpcCall(rpcUrl, "account_info", {
+    account: wallet.address,
+    ledger_index: "current",
+  });
+  const sequence = accountInfo.account_data?.Sequence;
+  if (sequence == null) {
+    throw new Error("Could not read account Sequence from account_info");
+  }
 
-    // Apply LastLedgerSequence buffer (at least 120 ledgers)
-    const serverInfo = await client.request({ command: "server_info" });
-    const validatedSeq = serverInfo.result?.info?.validated_ledger?.seq;
-    if (validatedSeq && prepared.LastLedgerSequence) {
-      const minLls = validatedSeq + 120;
-      if (prepared.LastLedgerSequence < minLls) {
-        prepared.LastLedgerSequence = minLls;
-      }
-    }
+  // 2. Fetch validated ledger + base fee + network ID from server_info
+  const serverInfo = await rpcCall(rpcUrl, "server_info", {});
+  const info = serverInfo.info;
+  const validatedSeq = info?.validated_ledger?.seq;
+  const baseFee = info?.validated_ledger?.base_fee_xrp;
+  const networkId = info?.network_id;
+  if (!validatedSeq) {
+    throw new Error("Could not read validated_ledger from server_info");
+  }
 
-    const signed = wallet.sign(prepared);
-    const submitResult = await client.submitAndWait(signed.tx_blob, {
-      failHard: true,
-    });
+  // 3. Build the AccountSet transaction
+  const feeDrops = baseFee
+    ? Math.ceil(parseFloat(baseFee) * 1_000_000).toString()
+    : "12";
+  const lastLedgerSeq = validatedSeq + 120;
 
-    const meta = submitResult.result?.meta as any;
-    const result = meta?.TransactionResult || "unknown";
+  const txJson: any = {
+    TransactionType: "AccountSet",
+    Account: wallet.address,
+    MessageKey: messageKeyHex,
+    Fee: feeDrops,
+    Sequence: sequence,
+    LastLedgerSequence: lastLedgerSeq,
+  };
 
+  // PFTL is a sidechain and requires NetworkID in transactions
+  if (networkId != null && networkId > 1024) {
+    txJson.NetworkID = networkId;
+  }
+
+  // 4. Sign locally
+  const signed = wallet.sign(txJson);
+
+  // 5. Submit via HTTP RPC
+  const submitResult = await rpcCall(rpcUrl, "submit", {
+    tx_blob: signed.tx_blob,
+  });
+
+  const engineResult = submitResult.engine_result;
+  if (engineResult !== "tesSUCCESS" && engineResult !== "terQUEUED") {
     return {
       txHash: signed.hash,
-      result,
+      result: engineResult || "unknown",
     };
-  });
+  }
+
+  // 6. Poll for validation
+  const maxAttempts = 30;
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    try {
+      const txResult = await rpcCall(rpcUrl, "tx", {
+        transaction: signed.hash,
+      });
+      if (txResult.validated) {
+        const meta = txResult.meta || {};
+        return {
+          txHash: signed.hash,
+          result: meta.TransactionResult || engineResult || "tesSUCCESS",
+        };
+      }
+    } catch {
+      // tx not found yet, keep polling
+    }
+  }
+
+  return {
+    txHash: signed.hash,
+    result: `submitted (${engineResult}) but not yet validated after ${maxAttempts * 2}s`,
+  };
 }
 
 /**

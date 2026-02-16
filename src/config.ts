@@ -79,7 +79,7 @@ export function loadConfig(): Config {
     pftlRpcUrl:
       process.env.PFTL_RPC_URL || "https://rpc.testnet.postfiat.org",
     pftlWssUrl:
-      process.env.PFTL_WSS_URL || "wss://rpc.testnet.postfiat.org:6008",
+      process.env.PFTL_WSS_URL || "wss://rpc.testnet.postfiat.org:6007",
     ipfsGatewayUrl:
       process.env.IPFS_GATEWAY_URL ||
       "https://pft-ipfs-testnet-node-1.fly.dev",
