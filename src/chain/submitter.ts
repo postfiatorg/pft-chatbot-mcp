@@ -110,6 +110,50 @@ export async function signAndSubmit(
 }
 
 /**
+ * Publish the bot's X25519 encryption public key as the MessageKey on the PFTL ledger.
+ * This allows other wallets to resolve the bot's encryption key from on-chain data
+ * so they can send encrypted messages.
+ */
+export async function publishMessageKey(
+  config: Config,
+  wallet: Wallet,
+  messageKeyHex: string
+): Promise<{ txHash: string; result: string }> {
+  return withClient(config.pftlWssUrl, async (client) => {
+    const accountSet: any = {
+      TransactionType: "AccountSet",
+      Account: wallet.address,
+      MessageKey: messageKeyHex,
+    };
+
+    const prepared = await client.autofill(accountSet);
+
+    // Apply LastLedgerSequence buffer (at least 120 ledgers)
+    const serverInfo = await client.request({ command: "server_info" });
+    const validatedSeq = serverInfo.result?.info?.validated_ledger?.seq;
+    if (validatedSeq && prepared.LastLedgerSequence) {
+      const minLls = validatedSeq + 120;
+      if (prepared.LastLedgerSequence < minLls) {
+        prepared.LastLedgerSequence = minLls;
+      }
+    }
+
+    const signed = wallet.sign(prepared);
+    const submitResult = await client.submitAndWait(signed.tx_blob, {
+      failHard: true,
+    });
+
+    const meta = submitResult.result?.meta as any;
+    const result = meta?.TransactionResult || "unknown";
+
+    return {
+      txHash: signed.hash,
+      result,
+    };
+  });
+}
+
+/**
  * Create a Wallet from a seed string.
  * Handles both hex seeds (starting with 's') and mnemonic phrases.
  */

@@ -4,6 +4,8 @@ import type { Config } from "../config.js";
 import { cacheApiKey } from "../config.js";
 import type { BotKeypair } from "../crypto/keys.js";
 import type { KeystoneClient } from "../grpc/client.js";
+import { publishMessageKey } from "../chain/submitter.js";
+import { getAccountInfo } from "../chain/scanner.js";
 
 export const registerBotSchema = z.object({
   name: z.string().describe("Display name for the bot"),
@@ -117,24 +119,61 @@ export async function executeRegisterBot(
     }
   );
 
-  return JSON.stringify(
-    {
-      agent_id: result.agentId || keypair.address,
-      wallet_address: keypair.address,
-      name: params.name,
-      capabilities,
-      supported_commands: result.supportedCommands || params.commands || [],
-      icon_emoji: result.iconEmoji || params.icon_emoji || "",
-      icon_color_hex: result.iconColorHex || params.icon_color_hex || "",
-      min_cost_first_message_drops:
-        result.minCostFirstMessageDrops ||
-        params.min_cost_first_message_drops ||
-        "0",
-      registered: true,
-    },
-    null,
-    2
-  );
+  // Step 3: Publish the X25519 encryption key as MessageKey on the PFTL ledger.
+  // This is required so other wallets can resolve the bot's encryption key
+  // from on-chain data and send encrypted messages.
+  const messageKeyHex = Buffer.from(keypair.x25519PublicKey).toString("hex");
+  let messageKeyPublished = false;
+  let messageKeyWarning: string | undefined;
+
+  try {
+    const accountInfo = await getAccountInfo(
+      config.pftlRpcUrl,
+      keypair.address
+    );
+
+    if (accountInfo.messageKey === messageKeyHex) {
+      // Key already matches on-chain, no transaction needed
+      messageKeyPublished = true;
+    } else {
+      const keyResult = await publishMessageKey(
+        config,
+        keypair.wallet,
+        messageKeyHex
+      );
+      if (keyResult.result === "tesSUCCESS") {
+        messageKeyPublished = true;
+      } else {
+        messageKeyWarning = `MessageKey transaction failed: ${keyResult.result}. Others may not be able to send encrypted messages until the key is published.`;
+      }
+    }
+  } catch (err: any) {
+    messageKeyWarning =
+      `Could not publish messaging key on-chain: ${err.message}. ` +
+      `Others may not be able to send encrypted messages until the key is published.`;
+  }
+
+  const response: Record<string, unknown> = {
+    agent_id: result.agentId || keypair.address,
+    wallet_address: keypair.address,
+    name: params.name,
+    capabilities,
+    supported_commands: result.supportedCommands || params.commands || [],
+    icon_emoji: result.iconEmoji || params.icon_emoji || "",
+    icon_color_hex: result.iconColorHex || params.icon_color_hex || "",
+    min_cost_first_message_drops:
+      result.minCostFirstMessageDrops ||
+      params.min_cost_first_message_drops ||
+      "0",
+    registered: true,
+    message_key_published: messageKeyPublished,
+  };
+
+  if (messageKeyWarning) {
+    response.message_key_warning = messageKeyWarning;
+  }
+
+  return JSON.stringify(response, null, 2);
 }
 
 /**

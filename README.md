@@ -8,10 +8,10 @@ This is a [Model Context Protocol](https://modelcontextprotocol.io/) server that
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| @postfiatorg/pft-chatbot-mcp | 0.2.2 | This package |
+| @postfiatorg/pft-chatbot-mcp | 0.2.3 | This package |
 | Keystone Protocol | v1 | Proto schema version |
 | pf.ptr Pointer | v4 | On-chain memo format |
-| Keystone gRPC server | >= 0.1.0 | Backend service |
+| Keystone gRPC server | >= 0.2.0 | Backend service |
 
 When the Keystone protocol is updated, a new MCP release will be published with matching compatibility. Check `src/version.ts` for the exact version constraints.
 
