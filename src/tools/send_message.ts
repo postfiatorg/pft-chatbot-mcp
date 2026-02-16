@@ -60,9 +60,14 @@ async function resolveRecipientKey(
 
   const info = await getAccountInfo(rpcUrl, recipientAddress);
 
-  // Try MessageKey first (explicit X25519 key published on-chain)
+  // Try MessageKey first (explicit X25519 key published on-chain).
+  // On-chain format is ED-prefixed: "ED" + 32-byte X25519 hex (66 chars total).
   if (info.messageKey) {
-    return Buffer.from(info.messageKey, "hex");
+    let keyHex = info.messageKey;
+    if (keyHex.length === 66 && keyHex.toUpperCase().startsWith("ED")) {
+      keyHex = keyHex.slice(2);
+    }
+    return Buffer.from(keyHex, "hex");
   }
 
   // Fall back to deriving from SigningPubKey (Ed25519 -> Curve25519)

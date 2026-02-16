@@ -122,7 +122,11 @@ export async function executeRegisterBot(
   // Step 3: Publish the X25519 encryption key as MessageKey on the PFTL ledger.
   // This is required so other wallets can resolve the bot's encryption key
   // from on-chain data and send encrypted messages.
-  const messageKeyHex = Buffer.from(keypair.x25519PublicKey).toString("hex");
+  // Format: ED prefix (Edwards-curve identifier) + 32-byte X25519 key = 66 hex chars.
+  const rawKeyHex = Buffer.from(keypair.x25519PublicKey)
+    .toString("hex")
+    .toUpperCase();
+  const messageKeyHex = `ED${rawKeyHex}`;
   let messageKeyPublished = false;
   let messageKeyWarning: string | undefined;
 
@@ -132,7 +136,9 @@ export async function executeRegisterBot(
       keypair.address
     );
 
-    if (accountInfo.messageKey === messageKeyHex) {
+    if (
+      accountInfo.messageKey?.toUpperCase() === messageKeyHex.toUpperCase()
+    ) {
       // Key already matches on-chain, no transaction needed
       messageKeyPublished = true;
     } else {
