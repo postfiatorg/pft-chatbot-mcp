@@ -154,14 +154,17 @@ async function main() {
 
     server.tool(
       "register_bot",
-      "Register or update this bot in the Keystone agent registry. Pass agent_id to update an existing registration. Auto-provisions an API key on first use.",
+      "Register or update this bot in the Keystone agent registry. Each wallet has exactly one bot registration (wallet address = agent ID). Calling again updates the existing registration. Auto-provisions an API key on first use.",
       {
         name: registerBotSchema.shape.name,
         description: registerBotSchema.shape.description,
         capabilities: registerBotSchema.shape.capabilities,
         url: registerBotSchema.shape.url,
-        agent_id: registerBotSchema.shape.agent_id,
         commands: registerBotSchema.shape.commands,
+        icon_emoji: registerBotSchema.shape.icon_emoji,
+        icon_color_hex: registerBotSchema.shape.icon_color_hex,
+        min_cost_first_message_drops:
+          registerBotSchema.shape.min_cost_first_message_drops,
       },
       async (params) => {
         try {

@@ -38,6 +38,13 @@ export interface CommandDescriptor {
   command: string;
   example: string;
   description: string;
+  minCostDrops: string; // uint64 as string (0 = no minimum beyond chain floor of 1 drop)
+}
+
+export interface BotProfileData {
+  iconEmoji: string;
+  iconColorHex: string;
+  minCostFirstMessageDrops: string; // uint64 as string
 }
 
 export interface AgentProviderData {
@@ -64,6 +71,9 @@ export interface AgentSearchResult {
   keystoneCapabilities: AgentCapabilitiesData;
   relevanceScore: number;
   supportedCommands: CommandDescriptor[];
+  iconEmoji: string;
+  iconColorHex: string;
+  minCostFirstMessageDrops: string;
 }
 
 export interface SearchAgentsResponse {
@@ -74,11 +84,18 @@ export interface SearchAgentsResponse {
 export interface StoreAgentCardResponse {
   agentCard: AgentCardData;
   supportedCommands: CommandDescriptor[];
+  iconEmoji: string;
+  iconColorHex: string;
+  minCostFirstMessageDrops: string;
+  agentId: string; // wallet address used as agent_id (server-derived)
 }
 
 export interface GetAgentCardResponse {
   agentCard: AgentCardData;
   supportedCommands: CommandDescriptor[];
+  iconEmoji: string;
+  iconColorHex: string;
+  minCostFirstMessageDrops: string;
 }
 
 export interface VerifyAndIssueKeyResponse {
@@ -269,13 +286,20 @@ export class KeystoneClient {
       command: string;
       example: string;
       description: string;
+      minCostDrops?: string;
     }>,
-    agentId?: string
+    profile?: {
+      iconEmoji?: string;
+      iconColorHex?: string;
+      minCostFirstMessageDrops?: string;
+    }
   ): Promise<StoreAgentCardResponse> {
     const call = promisify<any, StoreAgentCardResponse>(
       this.agentRegistry,
       (this.agentRegistry as any).storeAgentCard
     );
+    // agent_id is not sent -- the server derives it from the authenticated
+    // wallet address (one wallet = one bot).
     return call(
       {
         agentCard: {
@@ -296,13 +320,15 @@ export class KeystoneClient {
             capabilities.supportedSemanticCapabilities,
           supportedEncryptionModes: ["ENCRYPTION_MODE_PUBLIC_KEY"],
         },
-        agentId: agentId || "",
-        // supported_commands is a top-level field on the request, NOT inside agentCard
         supportedCommands: (commands || []).map((cmd) => ({
           command: cmd.command,
           example: cmd.example,
           description: cmd.description,
+          minCostDrops: cmd.minCostDrops || "0",
         })),
+        iconEmoji: profile?.iconEmoji || "",
+        iconColorHex: profile?.iconColorHex || "",
+        minCostFirstMessageDrops: profile?.minCostFirstMessageDrops || "0",
       },
       this.authMetadata()
     );

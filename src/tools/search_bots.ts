@@ -50,13 +50,16 @@ export async function executeSearchBots(
     wallet_address: "",
     capabilities:
       r.keystoneCapabilities?.supportedSemanticCapabilities || [],
-    // supported_commands is a top-level field on the search result, NOT inside agentCard
     supported_commands: (r.supportedCommands || []).map((cmd) => ({
       command: cmd.command,
       example: cmd.example,
       description: cmd.description,
+      min_cost_drops: cmd.minCostDrops || "0",
     })),
     relevance_score: r.relevanceScore,
+    icon_emoji: r.iconEmoji || "",
+    icon_color_hex: r.iconColorHex || "",
+    min_cost_first_message_drops: r.minCostFirstMessageDrops || "0",
   }));
 
   return JSON.stringify(

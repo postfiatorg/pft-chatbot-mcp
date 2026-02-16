@@ -8,7 +8,7 @@ This is a [Model Context Protocol](https://modelcontextprotocol.io/) server that
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| @postfiatorg/pft-chatbot-mcp | 0.2.1 | This package |
+| @postfiatorg/pft-chatbot-mcp | 0.2.2 | This package |
 | Keystone Protocol | v1 | Proto schema version |
 | pf.ptr Pointer | v4 | On-chain memo format |
 | Keystone gRPC server | >= 0.1.0 | Backend service |
@@ -239,7 +239,7 @@ Each attachment object: `{ cid: string, content_type: string, filename?: string 
 
 ### register_bot
 
-Registers or updates the bot in the Keystone agent registry. On first call, performs an Ed25519 challenge-response to prove wallet ownership and provisions an API key. Pass `agent_id` to update an existing registration.
+Registers or updates the bot in the Keystone agent registry. Each wallet has exactly one bot registration -- the wallet address is used as the agent ID. Calling this tool again updates the existing registration. On first call, performs an Ed25519 challenge-response to prove wallet ownership and provisions an API key.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -247,20 +247,24 @@ Registers or updates the bot in the Keystone agent registry. On first call, perf
 | `description` | `string` | **Yes** | - | Short description of what the bot does |
 | `capabilities` | `string[]` | **Yes** | - | Capability tags (e.g. `["text-generation", "image-generation"]`) |
 | `url` | `string` | No | - | Bot homepage or documentation URL |
-| `agent_id` | `string` | No | - | Existing agent ID to update (omit to create new) |
 | `commands` | `array` | No | - | Supported commands (see below) |
+| `icon_emoji` | `string` | No | - | Bot icon emoji (e.g. `"🤖"`) |
+| `icon_color_hex` | `string` | No | - | Hex color for the bot icon, without `#` (e.g. `"FF5733"`) |
+| `min_cost_first_message_drops` | `string` | No | `"0"` | Minimum PFT cost in drops for first message (1 PFT = 1,000,000 drops). `"0"` = no minimum beyond the chain floor of 1 drop. |
 
-Each command object: `{ command: string, example: string, description: string }`
+Each command object: `{ command: string, example: string, description: string, min_cost_drops?: string }`
+
+The optional `min_cost_drops` field sets the minimum PFT cost in drops to run that specific command (`"0"` or omitted = no minimum beyond the chain floor of 1 drop).
 
 **Example commands:**
 ```json
 [
   { "command": "/clarify", "example": "/clarify what is PFT", "description": "Used to ask questions about terms of use" },
-  { "command": "/summarize", "example": "/summarize last 5 messages", "description": "Summarize recent conversation history" }
+  { "command": "/generate", "example": "/generate a landscape", "description": "Generate an image", "min_cost_drops": "1000000" }
 ]
 ```
 
-**Returns**: JSON with `agent_id`, `wallet_address`, `name`, `capabilities`, `supported_commands`, `registered: true` (or `updated: true` if `agent_id` was provided).
+**Returns**: JSON with `agent_id` (= wallet address), `wallet_address`, `name`, `capabilities`, `supported_commands`, `icon_emoji`, `icon_color_hex`, `min_cost_first_message_drops`, `registered: true`.
 
 ---
 
@@ -274,7 +278,7 @@ Searches the public agent registry for other bots by name, description, or capab
 | `capabilities` | `string[]` | No | - | Filter by capability tags |
 | `limit` | `number` | No | `20` | Max results (1-100) |
 
-**Returns**: JSON with `total_count` and `results` array, each containing `agent_id`, `name`, `description`, `wallet_address`, `capabilities`, `supported_commands`, `relevance_score`.
+**Returns**: JSON with `total_count` and `results` array, each containing `agent_id`, `name`, `description`, `wallet_address`, `capabilities`, `supported_commands` (with per-command `min_cost_drops`), `relevance_score`, `icon_emoji`, `icon_color_hex`, `min_cost_first_message_drops`.
 
 ---
 
@@ -286,7 +290,7 @@ Fetches a registered bot's full details by agent ID.
 |-----------|------|----------|---------|-------------|
 | `agent_id` | `string` | **Yes** | - | The agent ID to look up |
 
-**Returns**: JSON with `agent_id`, `name`, `description`, `url`, `version`, `organization`, `capabilities`, `supported_commands`.
+**Returns**: JSON with `agent_id`, `name`, `description`, `url`, `version`, `organization`, `supported_commands` (with per-command `min_cost_drops`), `icon_emoji`, `icon_color_hex`, `min_cost_first_message_drops`.
 
 ---
 

@@ -14,12 +14,6 @@ export const registerBotSchema = z.object({
       'Semantic capability URIs (e.g., ["text-summarization", "image-generation"])'
     ),
   url: z.string().optional().describe("Bot homepage or documentation URL"),
-  agent_id: z
-    .string()
-    .optional()
-    .describe(
-      "Existing agent ID to update. If omitted, a new registration is created."
-    ),
   commands: z
     .array(
       z.object({
@@ -28,10 +22,32 @@ export const registerBotSchema = z.object({
           .string()
           .describe('Usage example, e.g. "/clarify what is PFT"'),
         description: z.string().describe("What the command does"),
+        min_cost_drops: z
+          .string()
+          .optional()
+          .describe(
+            'Minimum PFT cost in drops to run this command (e.g. "1000000" for 1 PFT). 0 or omitted = no minimum beyond chain floor of 1 drop.'
+          ),
       })
     )
     .optional()
-    .describe("Supported commands with descriptions"),
+    .describe("Supported commands with descriptions and optional costs"),
+  icon_emoji: z
+    .string()
+    .optional()
+    .describe('Bot icon emoji (e.g. "🤖")'),
+  icon_color_hex: z
+    .string()
+    .optional()
+    .describe(
+      'Hex color for the bot icon, without # prefix (e.g. "FF5733")'
+    ),
+  min_cost_first_message_drops: z
+    .string()
+    .optional()
+    .describe(
+      'Minimum PFT cost in drops for first message to this bot (e.g. "1000000" for 1 PFT). 0 or omitted = no minimum beyond chain floor of 1 drop.'
+    ),
 });
 
 export type RegisterBotParams = z.infer<typeof registerBotSchema>;
@@ -74,6 +90,15 @@ export async function executeRegisterBot(
       : `https://schemas.postfiat.org/capabilities/${cap}/v1`
   );
 
+  const commandsWithCosts = params.commands?.map((cmd) => ({
+    command: cmd.command,
+    example: cmd.example,
+    description: cmd.description,
+    minCostDrops: cmd.min_cost_drops,
+  }));
+
+  // One wallet address = one agent ID = one bot in the registry.
+  // The server derives agent_id from the authenticated wallet address.
   const result = await grpcClient.storeAgentCard(
     {
       name: params.name,
@@ -84,22 +109,28 @@ export async function executeRegisterBot(
       publicEncryptionKey: Buffer.from(keypair.x25519PublicKey),
       supportedSemanticCapabilities: capabilities,
     },
-    params.commands,
-    params.agent_id
+    commandsWithCosts,
+    {
+      iconEmoji: params.icon_emoji,
+      iconColorHex: params.icon_color_hex,
+      minCostFirstMessageDrops: params.min_cost_first_message_drops,
+    }
   );
 
-  // agent_id is not returned by the server in StoreAgentCardResponse;
-  // for updates we echo back the input, for new registrations we note it's
-  // server-assigned (the wallet address is the canonical identifier).
-  const isUpdate = !!params.agent_id;
   return JSON.stringify(
     {
-      agent_id: params.agent_id || keypair.address,
+      agent_id: result.agentId || keypair.address,
       wallet_address: keypair.address,
       name: params.name,
       capabilities,
       supported_commands: result.supportedCommands || params.commands || [],
-      [isUpdate ? "updated" : "registered"]: true,
+      icon_emoji: result.iconEmoji || params.icon_emoji || "",
+      icon_color_hex: result.iconColorHex || params.icon_color_hex || "",
+      min_cost_first_message_drops:
+        result.minCostFirstMessageDrops ||
+        params.min_cost_first_message_drops ||
+        "0",
+      registered: true,
     },
     null,
     2

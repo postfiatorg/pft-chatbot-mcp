@@ -28,9 +28,10 @@ message KeystoneAgentCapabilities {
 // Describes a command the bot supports, surfaced in the FE as a table:
 //   command | example | description
 message CommandDescriptor {
-  string command = 1;      // e.g. "/clarify"
-  string example = 2;      // e.g. "/clarify what is PFT"
-  string description = 3;  // e.g. "Used to ask questions about terms of use"
+  string command = 1;          // e.g. "/clarify"
+  string example = 2;          // e.g. "/clarify what is PFT"
+  string description = 3;      // e.g. "Used to ask questions about terms of use"
+  uint64 min_cost_drops = 4;   // minimum PFT cost in drops (0 = no minimum beyond chain floor of 1 drop)
 }
 
 // Service provider information (matches a2a.v1.AgentProvider field layout).
@@ -70,11 +71,18 @@ message KeystoneStoreAgentCardRequest {
   KeystoneAgentCapabilities keystone_capabilities = 2;
   string agent_id = 3;
   repeated CommandDescriptor supported_commands = 4;  // top-level, NOT inside agent_card
+  string icon_emoji = 5;                              // bot icon emoji (e.g. "🤖")
+  string icon_color_hex = 6;                          // hex color without # (e.g. "FF5733")
+  uint64 min_cost_first_message_drops = 7;            // min PFT in drops for first message (0 = chain floor)
 }
 
 message KeystoneStoreAgentCardResponse {
   SimpleAgentCard agent_card = 1;
   repeated CommandDescriptor supported_commands = 2;
+  string icon_emoji = 3;
+  string icon_color_hex = 4;
+  uint64 min_cost_first_message_drops = 5;
+  string agent_id = 6;  // The wallet address used as agent_id (server-derived)
 }
 
 // --- Get ---
@@ -86,6 +94,9 @@ message KeystoneGetAgentCardRequest {
 message KeystoneGetAgentCardResponse {
   SimpleAgentCard agent_card = 1;
   repeated CommandDescriptor supported_commands = 2;
+  string icon_emoji = 3;
+  string icon_color_hex = 4;
+  uint64 min_cost_first_message_drops = 5;
 }
 
 // --- Search ---
@@ -109,6 +120,9 @@ message KeystoneAgentSearchResult {
   KeystoneAgentCapabilities keystone_capabilities = 3;
   float relevance_score = 4;
   repeated CommandDescriptor supported_commands = 5;
+  string icon_emoji = 6;
+  string icon_color_hex = 7;
+  uint64 min_cost_first_message_drops = 8;
 }
 
 // --- Delete ---
