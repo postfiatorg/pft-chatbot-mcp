@@ -59,14 +59,18 @@ let keystoneEnvelopeType: protobuf.Type | null = null;
 async function loadProtos(): Promise<void> {
   if (pfPointerType && keystoneEnvelopeType) return;
 
-  const pfRoot = await protobuf.load(
-    resolve(PROTO_DIR, "pf/ptr/v4/pointer.proto")
-  );
+  // Use a custom Root so proto imports (e.g. "pf/common/v4/common.proto")
+  // resolve relative to PROTO_DIR, not relative to the importing file.
+  const pfRoot = new protobuf.Root();
+  pfRoot.resolvePath = (_origin: string, target: string) =>
+    resolve(PROTO_DIR, target);
+  await pfRoot.load(resolve(PROTO_DIR, "pf/ptr/v4/pointer.proto"));
   pfPointerType = pfRoot.lookupType("pf.ptr.v4.Pointer");
 
-  const ksRoot = await protobuf.load(
-    resolve(PROTO_DIR, "keystone/v1/core/envelope.proto")
-  );
+  const ksRoot = new protobuf.Root();
+  ksRoot.resolvePath = (_origin: string, target: string) =>
+    resolve(PROTO_DIR, target);
+  await ksRoot.load(resolve(PROTO_DIR, "keystone/v1/core/envelope.proto"));
   keystoneEnvelopeType = ksRoot.lookupType("keystone.v1.core.KeystoneEnvelope");
 }
 
@@ -100,7 +104,14 @@ export async function decodePfPointer(
 ): Promise<DecodedPfPointer> {
   await loadProtos();
   const bytes = Buffer.from(memoDataHex, "hex");
-  const decoded = pfPointerType!.decode(bytes) as any;
+  const raw = pfPointerType!.decode(bytes);
+
+  // Convert to plain object with enum values as strings (e.g. kind=4 -> "CHAT").
+  // Without { enums: String }, protobufjs returns numeric enum values.
+  const decoded = pfPointerType!.toObject(raw, {
+    enums: String,
+    defaults: true,
+  }) as any;
 
   return {
     type: "pf.ptr",

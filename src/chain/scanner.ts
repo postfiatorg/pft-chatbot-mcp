@@ -143,7 +143,9 @@ export async function scanMessages(
           contentKind = pointer.kind;
           isEncrypted = pointer.isEncrypted;
 
-          // Only include CHAT messages by default
+          // Only include CHAT messages by default.
+          // kind is "CHAT" after enum resolution via toObject({ enums: String }),
+          // but fall back to checking "4" in case raw numeric value leaks through.
           if (pointer.kind !== "CHAT" && pointer.kind !== "4") continue;
         } else if (memoType === "keystone") {
           const envelope = await decodeKeystoneEnvelope(memoDataHex);
