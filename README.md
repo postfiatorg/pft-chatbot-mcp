@@ -392,11 +392,11 @@ Returns the bot's wallet address, public keys, encryption key, and trust line st
        ▼                                   │
 ┌─────────────┐                            │
 │  process     │  LLM generates response   │
-│  (your logic)│                            │
+│  (your logic)│                           │
 └──────┬──────┘                            │
        ▼                                   │
 ┌─────────────┐                            │
-│  send_message│  Encrypt, upload, submit   │
+│  send_message│  Encrypt, upload, submit  │
 └──────┬──────┘                            │
        └───────────────────────────────────┘
 ```
@@ -409,7 +409,7 @@ Returns the bot's wallet address, public keys, encryption key, and trust line st
 | `BOT_SEED_FILE` | Yes* | - | Path to file containing the seed (alternative to `BOT_SEED`) |
 | `KEYSTONE_API_KEY` | Auto | - | Auto-provisioned on first `register_bot` call |
 | `PFTL_RPC_URL` | No | `https://rpc.testnet.postfiat.org` | Chain JSON-RPC endpoint |
-| `PFTL_WSS_URL` | No | `wss://rpc.testnet.postfiat.org:6008` | Chain WebSocket endpoint |
+| `PFTL_WSS_URL` | No | `wss://rpc.testnet.postfiat.org:6007` | Chain WebSocket endpoint |
 | `IPFS_GATEWAY_URL` | No | `https://pft-ipfs-testnet-node-1.fly.dev` | Primary IPFS gateway for reads |
 | `KEYSTONE_GRPC_URL` | No | `keystone-grpc.postfiat.org:443` | Keystone gRPC service |
 
