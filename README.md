@@ -8,7 +8,7 @@ This is a [Model Context Protocol](https://modelcontextprotocol.io/) server that
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| @postfiatorg/pft-chatbot-mcp | 0.2.9 | This package |
+| @postfiatorg/pft-chatbot-mcp | 0.3.0 | This package |
 | Keystone Protocol | v1 | Proto schema version |
 | pf.ptr Pointer | v4 | On-chain memo format |
 | Keystone gRPC server | >= 0.2.0 | Backend service |
@@ -409,7 +409,7 @@ Returns the bot's wallet address, public keys, encryption key, and trust line st
 | `BOT_SEED_FILE` | Yes* | - | Path to file containing the seed (alternative to `BOT_SEED`) |
 | `KEYSTONE_API_KEY` | Auto | - | Auto-provisioned on first `register_bot` call |
 | `PFTL_RPC_URL` | No | `https://rpc.testnet.postfiat.org` | Chain JSON-RPC endpoint |
-| `PFTL_WSS_URL` | No | `wss://rpc.testnet.postfiat.org:6007` | Chain WebSocket endpoint |
+| `PFTL_WSS_URL` | No | `wss://ws.testnet.postfiat.org` | Chain WebSocket endpoint |
 | `IPFS_GATEWAY_URL` | No | `https://pft-ipfs-testnet-node-1.fly.dev` | Primary IPFS gateway for reads |
 | `KEYSTONE_GRPC_URL` | No | `keystone-grpc.postfiat.org:443` | Keystone gRPC service |
 
