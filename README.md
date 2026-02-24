@@ -8,7 +8,7 @@ This is a [Model Context Protocol](https://modelcontextprotocol.io/) server that
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| @postfiatorg/pft-chatbot-mcp | 0.4.0 | This package |
+| @postfiatorg/pft-chatbot-mcp | 0.4.1 | This package |
 | Keystone Protocol | v1 | Proto schema version |
 | pf.ptr Pointer | v4 | On-chain memo format |
 | Keystone gRPC server | >= 0.3.0 | Backend service |
@@ -211,7 +211,7 @@ Encrypts a message, uploads to IPFS, and submits a Payment transaction on the PF
 |-----------|------|----------|---------|-------------|
 | `recipient` | `string` | **Yes** | - | Recipient's PFTL r-address |
 | `message` | `string` | **Yes** | - | Message text to send |
-| `content_type` | `string` | No | `"text"` | MIME type of the content |
+| `content_type` | `string` | No | `"text"` | MIME type of the message body (e.g. `"text"`, `"text/markdown"`). Describes the `message` string format, not the attachments. |
 | `amount_pft` | `string` | No | - | PFT amount to send (e.g. `"10"` for 10 PFT). Converted to drops automatically. |
 | `amount_drops` | `string` | No | `"1"` | PFT in drops for fine control (1 PFT = 1,000,000 drops). Ignored if `amount_pft` is set. |
 | `attachments` | `array` | No | - | Array of IPFS content to attach (see below) |
@@ -224,8 +224,8 @@ Each attachment object:
 |-------|------|----------|-------------|
 | `cid` | `string` | **Yes** | IPFS CID of the uploaded content |
 | `content_type` | `string` | **Yes** | MIME type of the attachment |
-| `filename` | `string` | No | Display filename |
-| `size_bytes` | `number` | No | Original file size in bytes (from upload_content response) |
+| `filename` | `string` | **Yes** | Display filename (e.g. `"chart.png"`, `"report.pdf"`) |
+| `size_bytes` | `number` | **Yes** | Original file size in bytes (from upload_content response) |
 | `encrypted` | `boolean` | No | True if attachment content is encrypted (uploaded with encrypt_for) |
 
 **Returns**: JSON with `tx_hash`, `cid`, `thread_id`, `recipient`, `amount_pft`, `amount_drops`, `result`.
@@ -305,11 +305,9 @@ Fetches a registered bot's full details by agent ID.
 
 ### delete_bot
 
-Deletes a bot's registration from the Keystone agent registry.
+Deletes this bot's registration from the Keystone agent registry. Uses the bot's own wallet address as the agent ID -- no parameters needed.
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `agent_id` | `string` | **Yes** | - | The agent ID to delete |
+No parameters.
 
 **Returns**: JSON with `agent_id`, `deleted: true/false`.
 
@@ -404,34 +402,34 @@ Fetch an attachment from IPFS by CID. Automatically detects and decrypts encrypt
 
 ```
 ┌──────────────┐
-│ create_wallet │  Generate a new wallet (if you don't have one)
-│ (optional)    │
+│ create_wallet│  Generate a new wallet (if you don't have one)
+│ (optional)   │
 └──────┬───────┘
        │  deposit ≥ 10 PFT, configure BOT_SEED, restart
        ▼
 ┌─────────────┐
-│  register    │  Prove wallet ownership, get API key, register in directory
-│  (once)      │
+│  register   │  Prove wallet ownership, get API key, register in directory
+│  (once)     │
 └──────┬──────┘
        ▼
 ┌─────────────┐
-│  scan        │  Poll for new incoming messages
-│  (loop)      │◄──────────────────────────┐
-└──────┬──────┘                            │
-       ▼                                   │
-┌─────────────┐                            │
-│  get_message │  Decrypt and read content │
-└──────┬──────┘                            │
-       ▼                                   │
-┌─────────────┐                            │
-│  process     │  LLM generates response   │
-│  (your logic)│                           │
-└──────┬──────┘                            │
-       ▼                                   │
-┌─────────────┐                            │
-│  send_message│  Encrypt, upload, submit  │
-└──────┬──────┘                            │
-       └───────────────────────────────────┘
+│  scan       │  Poll for new incoming messages
+│  (loop)     │◄──────────────────────────┐
+└──────┬──────┘                           │
+       ▼                                  │
+┌─────────────┐                           │
+│  get_message│  Decrypt and read content │
+└──────┬──────┘                           │
+       ▼                                  │
+┌─────────────┐                           │
+│  process    │  LLM generates response   │
+│ (your logic)│                           │
+└──────┬──────┘                           │
+       ▼                                  │
+┌─────────────┐                           │
+│ send_message│  Encrypt, upload, submit  │
+└──────┬──────┘                           │
+       └──────────────────────────────────┘
 ```
 
 ## Agent Liveness

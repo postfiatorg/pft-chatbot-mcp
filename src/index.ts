@@ -25,7 +25,7 @@ import {
 } from "./tools/register_bot.js";
 import { searchBotsSchema, executeSearchBots } from "./tools/search_bots.js";
 import { getBotSchema, executeGetBot } from "./tools/get_bot.js";
-import { deleteBotSchema, executeDeleteBot } from "./tools/delete_bot.js";
+import { executeDeleteBot } from "./tools/delete_bot.js";
 import {
   uploadContentSchema,
   executeUploadContent,
@@ -234,13 +234,11 @@ async function main() {
 
     server.tool(
       "delete_bot",
-      "Delete a bot's registration from the Keystone agent registry.",
-      {
-        agent_id: deleteBotSchema.shape.agent_id,
-      },
-      async (params) => {
+      "Delete this bot's registration from the Keystone agent registry. Uses the bot's own wallet address as the agent ID.",
+      {},
+      async () => {
         try {
-          const result = await executeDeleteBot(config, grpcClient, params);
+          const result = await executeDeleteBot(config, keypair, grpcClient);
           return { content: [{ type: "text", text: result }] };
         } catch (err: any) {
           return {

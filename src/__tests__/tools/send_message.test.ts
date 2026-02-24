@@ -23,22 +23,32 @@ describe("sendMessageSchema", () => {
     }
   });
 
-  it("accepts attachments without size_bytes (backward compat)", () => {
-    const result = sendMessageSchema.safeParse({
+  it("rejects attachments missing filename or size_bytes", () => {
+    const noFilename = sendMessageSchema.safeParse({
       recipient: "rRecipient123",
-      message: "legacy",
+      message: "missing filename",
       attachments: [
         {
           cid: "bafkreitest",
           content_type: "text/markdown",
+          size_bytes: 1024,
         },
       ],
     });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.attachments![0].size_bytes).toBeUndefined();
-      expect(result.data.attachments![0].encrypted).toBeUndefined();
-    }
+    expect(noFilename.success).toBe(false);
+
+    const noSize = sendMessageSchema.safeParse({
+      recipient: "rRecipient123",
+      message: "missing size",
+      attachments: [
+        {
+          cid: "bafkreitest",
+          content_type: "text/markdown",
+          filename: "doc.md",
+        },
+      ],
+    });
+    expect(noSize.success).toBe(false);
   });
 
   it("accepts message without attachments", () => {

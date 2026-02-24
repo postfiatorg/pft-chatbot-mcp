@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-02-24
+
+### Changed
+
+- **`delete_bot` No Longer Requires Parameters**: The tool now derives the agent ID from the bot's own wallet address. The deprecated `agent_id` parameter has been removed.
+- **Attachment `filename` and `size_bytes` Now Required**: `send_message` attachment objects require `filename` and `size_bytes` fields (previously optional) to prevent metadata spoofing and ensure proper FE display.
+- **`content_type` Description Clarified**: The `send_message` `content_type` parameter description now clarifies it describes the message body format (e.g. `"text"`, `"text/markdown"`), not attachment MIME types.
+
 ## [0.4.0] - 2025-02-24
 
 ### Added

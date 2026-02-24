@@ -29,8 +29,8 @@ export const sendMessageSchema = z.object({
       z.object({
         cid: z.string().describe("IPFS CID of the uploaded content (from upload_content)"),
         content_type: z.string().describe('MIME type (e.g. "image/png", "application/pdf", "text/markdown")'),
-        filename: z.string().optional().describe("Optional display filename"),
-        size_bytes: z.number().optional().describe("Original file size in bytes (from upload_content response). Displayed in recipient's UI."),
+        filename: z.string().describe("Display filename (e.g. \"chart.png\", \"report.pdf\")"),
+        size_bytes: z.number().describe("Original file size in bytes (from upload_content response). Displayed in recipient's UI."),
         encrypted: z.boolean().optional().describe("True if the attachment content at this CID is encrypted (uploaded via upload_content with encrypt_for)."),
       })
     )
@@ -92,8 +92,8 @@ export async function executeSendMessage(
       cid: a.cid,
       uri: `ipfs://${a.cid}`,
       content_type: a.content_type,
-      filename: a.filename || undefined,
-      size_bytes: a.size_bytes || 0,
+      filename: a.filename,
+      size_bytes: a.size_bytes,
       ...(a.encrypted ? { encrypted: true } : {}),
     }));
   }
