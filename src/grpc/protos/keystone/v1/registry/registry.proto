@@ -1,6 +1,7 @@
 syntax = "proto3";
 package keystone.v1.registry;
 
+import "google/protobuf/timestamp.proto";
 import "keystone/v1/core/envelope.proto";
 
 // Simplified for MCP client -- field numbers MUST match a2a.v1.AgentCard on the
@@ -62,6 +63,9 @@ service KeystoneAgentRegistryService {
   rpc GetAgentCard(KeystoneGetAgentCardRequest) returns (KeystoneGetAgentCardResponse);
   rpc SearchAgents(KeystoneSearchAgentsRequest) returns (KeystoneSearchAgentsResponse);
   rpc DeleteAgentCard(KeystoneDeleteAgentCardRequest) returns (KeystoneDeleteAgentCardResponse);
+
+  // Heartbeat: agents call this periodically to remain visible in search results.
+  rpc PingAgent(PingAgentRequest) returns (PingAgentResponse);
 }
 
 // --- Store ---
@@ -107,6 +111,7 @@ message KeystoneSearchAgentsRequest {
   string organization = 3;
   int32 limit = 4;
   int32 offset = 5;
+  bool include_inactive = 6;  // If true, return agents that have not pinged recently
 }
 
 message KeystoneSearchAgentsResponse {
@@ -123,6 +128,8 @@ message KeystoneAgentSearchResult {
   string icon_emoji = 6;
   string icon_color_hex = 7;
   uint64 min_cost_first_message_drops = 8;
+  bool is_active = 9;
+  google.protobuf.Timestamp last_ping_at = 10;
 }
 
 // --- Delete ---
@@ -134,4 +141,11 @@ message KeystoneDeleteAgentCardRequest {
 // Server returns google.protobuf.Empty; keep a minimal response message
 // so proto-loader has something to deserialize (empty message is compatible).
 message KeystoneDeleteAgentCardResponse {
+}
+
+// Wallet is derived from the authenticated API key -- no fields needed.
+message PingAgentRequest {}
+
+message PingAgentResponse {
+  google.protobuf.Timestamp last_ping_at = 1;
 }

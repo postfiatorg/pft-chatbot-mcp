@@ -65,6 +65,11 @@ export interface AgentCapabilitiesData {
   supportedSemanticCapabilities: string[];
 }
 
+export interface ProtoTimestamp {
+  seconds: string;
+  nanos: number;
+}
+
 export interface AgentSearchResult {
   agentId: string;
   agentCard: AgentCardData;
@@ -74,6 +79,12 @@ export interface AgentSearchResult {
   iconEmoji: string;
   iconColorHex: string;
   minCostFirstMessageDrops: string;
+  isActive: boolean;
+  lastPingAt: ProtoTimestamp | null;
+}
+
+export interface PingAgentResponse {
+  lastPingAt: ProtoTimestamp;
 }
 
 export interface SearchAgentsResponse {
@@ -337,7 +348,8 @@ export class KeystoneClient {
   async searchAgents(
     query?: string,
     capabilities?: string[],
-    limit: number = 20
+    limit: number = 20,
+    includeInactive?: boolean
   ): Promise<SearchAgentsResponse> {
     const call = promisify<any, SearchAgentsResponse>(
       this.agentRegistry,
@@ -349,6 +361,7 @@ export class KeystoneClient {
         capabilities: capabilities || [],
         limit,
         offset: 0,
+        includeInactive: includeInactive || false,
       },
       this.authMetadata()
     );
@@ -368,6 +381,14 @@ export class KeystoneClient {
       (this.agentRegistry as any).deleteAgentCard
     );
     return call({ agentId }, this.authMetadata());
+  }
+
+  async pingAgent(): Promise<PingAgentResponse> {
+    const call = promisify<any, PingAgentResponse>(
+      this.agentRegistry,
+      (this.agentRegistry as any).pingAgent
+    );
+    return call({}, this.authMetadata());
   }
 
   close(): void {

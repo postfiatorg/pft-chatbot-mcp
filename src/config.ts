@@ -14,6 +14,8 @@ export interface Config {
   keystoneGrpcUrl: string;
   /** Keystone API key (auto-provisioned on first register_bot call) */
   keystoneApiKey: string | null;
+  /** Ping interval in ms (default 900000 = 15 min, 0 = disabled) */
+  pingIntervalMs: number;
 }
 
 const API_KEY_CACHE_FILE = ".keystone-api-key";
@@ -68,6 +70,18 @@ function loadBotSeed(): string {
   );
 }
 
+function parsePingInterval(envVal: string | undefined): number {
+  if (!envVal) return 900_000;
+  const parsed = parseInt(envVal, 10);
+  if (isNaN(parsed) || parsed < 0) {
+    process.stderr.write(
+      `[config] WARN – Invalid PING_INTERVAL_MS="${envVal}", using default 900000ms\n`
+    );
+    return 900_000;
+  }
+  return parsed;
+}
+
 export function loadConfig(): Config {
   const botSeed = loadBotSeed();
 
@@ -86,5 +100,6 @@ export function loadConfig(): Config {
     keystoneGrpcUrl:
       process.env.KEYSTONE_GRPC_URL || "keystone-grpc.postfiat.org:443",
     keystoneApiKey,
+    pingIntervalMs: parsePingInterval(process.env.PING_INTERVAL_MS),
   };
 }

@@ -3,11 +3,9 @@ import type { Config } from "../config.js";
 import type { BotKeypair } from "../crypto/keys.js";
 import type { KeystoneClient } from "../grpc/client.js";
 import { encryptPayloadForRecipients } from "../crypto/encrypt.js";
+import { resolveRecipientKey } from "../crypto/resolve_key.js";
 import { buildPfPointerMemo, POINTER_FLAGS } from "../chain/pointer.js";
 import { preparePayment, signAndSubmit } from "../chain/submitter.js";
-import { getAccountInfo } from "../chain/scanner.js";
-import sodium from "../crypto/sodium.js";
-import { createHash } from "node:crypto";
 
 export const sendMessageSchema = z.object({
   recipient: z
@@ -32,10 +30,12 @@ export const sendMessageSchema = z.object({
         cid: z.string().describe("IPFS CID of the uploaded content (from upload_content)"),
         content_type: z.string().describe('MIME type (e.g. "image/png", "application/pdf", "text/markdown")'),
         filename: z.string().optional().describe("Optional display filename"),
+        size_bytes: z.number().optional().describe("Original file size in bytes (from upload_content response). Displayed in recipient's UI."),
+        encrypted: z.boolean().optional().describe("True if the attachment content at this CID is encrypted (uploaded via upload_content with encrypt_for)."),
       })
     )
     .optional()
-    .describe("Attach IPFS content (images, docs, etc.) uploaded via upload_content. Each attachment needs the CID and MIME type."),
+    .describe("Attach IPFS content uploaded via upload_content. Include size_bytes from the upload response for proper FE display. Set encrypted: true for attachments uploaded with encrypt_for."),
   reply_to_tx: z
     .string()
     .optional()
@@ -47,47 +47,6 @@ export const sendMessageSchema = z.object({
 });
 
 export type SendMessageParams = z.infer<typeof sendMessageSchema>;
-
-/**
- * Resolve the recipient's X25519 public key for encryption.
- * Tries: 1) MessageKey from chain, 2) derive from SigningPubKey
- */
-async function resolveRecipientKey(
-  rpcUrl: string,
-  recipientAddress: string
-): Promise<Uint8Array> {
-  await sodium.ready;
-
-  const info = await getAccountInfo(rpcUrl, recipientAddress);
-
-  // Try MessageKey first (explicit X25519 key published on-chain).
-  // On-chain format is ED-prefixed: "ED" + 32-byte X25519 hex (66 chars total).
-  if (info.messageKey) {
-    let keyHex = info.messageKey;
-    if (keyHex.length === 66 && keyHex.toUpperCase().startsWith("ED")) {
-      keyHex = keyHex.slice(2);
-    }
-    return Buffer.from(keyHex, "hex");
-  }
-
-  // Fall back to deriving from SigningPubKey (Ed25519 -> Curve25519)
-  if (info.publicKey && info.publicKey.length >= 64) {
-    // PFTL public keys are prefixed with ED for Ed25519
-    let pubkeyHex = info.publicKey;
-    if (pubkeyHex.toUpperCase().startsWith("ED")) {
-      pubkeyHex = pubkeyHex.slice(2);
-    }
-    const ed25519Pubkey = Buffer.from(pubkeyHex, "hex");
-    if (ed25519Pubkey.length === 32) {
-      return sodium.crypto_sign_ed25519_pk_to_curve25519(ed25519Pubkey);
-    }
-  }
-
-  throw new Error(
-    `Cannot resolve encryption key for ${recipientAddress}. ` +
-      `The recipient has no MessageKey set and the SigningPubKey could not be converted.`
-  );
-}
 
 export async function executeSendMessage(
   config: Config,
@@ -128,13 +87,14 @@ export async function executeSendMessage(
     reply_to_tx: params.reply_to_tx || undefined,
   };
 
-  // Include attachments if provided (images, docs, etc.)
   if (params.attachments && params.attachments.length > 0) {
     payload.attachments = params.attachments.map((a) => ({
       cid: a.cid,
       uri: `ipfs://${a.cid}`,
       content_type: a.content_type,
       filename: a.filename || undefined,
+      size_bytes: a.size_bytes || 0,
+      ...(a.encrypted ? { encrypted: true } : {}),
     }));
   }
 

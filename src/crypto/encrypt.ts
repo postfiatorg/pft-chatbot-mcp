@@ -5,63 +5,58 @@ function toBase64(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("base64");
 }
 
+export interface EncryptedBlob {
+  version: number;
+  enc: string;
+  nonce: string;
+  ciphertext: string;
+  content_hash: string;
+  recipients: Array<{
+    recipient_id: string;
+    ephemeral_pubkey: string;
+    wrap_nonce: string;
+    encrypted_file_key: string;
+  }>;
+}
+
 /**
- * Encrypt a payload for multiple recipients using XChaCha20-Poly1305
- * with per-recipient X25519 key wrapping.
- *
- * This matches the encryption scheme in pftasks/api/src/lib/encryption_utils.js:
- * 1. Generate a random file key (symmetric)
- * 2. Encrypt plaintext with XChaCha20-Poly1305 using the file key
- * 3. For each recipient, wrap the file key with X25519 DH (crypto_box_easy)
+ * Shared core: encrypt raw bytes for multiple recipients.
  */
-export async function encryptPayloadForRecipients(
-  plaintext: string,
+async function encryptForRecipients(
+  contentBytes: Uint8Array,
   recipientPublicKeys: Uint8Array[]
-): Promise<any> {
+): Promise<EncryptedBlob> {
   await sodium.ready;
 
-  const textBytes = Buffer.from(plaintext, "utf8");
-
-  // Generate random file key
   const fileKey = sodium.randombytes_buf(
     sodium.crypto_aead_xchacha20poly1305_ietf_KEYBYTES
   );
-
-  // Encrypt the plaintext
   const nonce = sodium.randombytes_buf(
     sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES
   );
   const ciphertext = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
-    textBytes,
+    contentBytes,
     null,
     null,
     nonce,
     fileKey
   );
 
-  // Compute content hash
-  const contentHash = createHash("sha256").update(textBytes).digest("hex");
+  const contentHash = createHash("sha256").update(contentBytes).digest("hex");
 
-  // Wrap file key for each recipient
-  const recipients: any[] = [];
+  const recipients: EncryptedBlob["recipients"] = [];
   for (const recipientPubkey of recipientPublicKeys) {
-    // Generate ephemeral X25519 keypair for this recipient
     const ephemeral = sodium.crypto_box_keypair();
     const wrapNonce = sodium.randombytes_buf(sodium.crypto_box_NONCEBYTES);
-
-    // Wrap the file key
     const encryptedFileKey = sodium.crypto_box_easy(
       fileKey,
       wrapNonce,
       recipientPubkey,
       ephemeral.privateKey
     );
-
-    // Compute recipient_id as SHA-256 of their public key
     const recipientIdHash = createHash("sha256")
       .update(recipientPubkey)
       .digest("hex");
-
     recipients.push({
       recipient_id: recipientIdHash,
       ephemeral_pubkey: toBase64(ephemeral.publicKey),
@@ -78,4 +73,27 @@ export async function encryptPayloadForRecipients(
     content_hash: contentHash,
     recipients,
   };
+}
+
+/**
+ * Encrypt a UTF-8 plaintext string for multiple recipients using
+ * XChaCha20-Poly1305 with per-recipient X25519 key wrapping.
+ */
+export async function encryptPayloadForRecipients(
+  plaintext: string,
+  recipientPublicKeys: Uint8Array[]
+): Promise<EncryptedBlob> {
+  const textBytes = Buffer.from(plaintext, "utf8");
+  return encryptForRecipients(textBytes, recipientPublicKeys);
+}
+
+/**
+ * Encrypt raw binary content (e.g. file attachment) for multiple recipients.
+ * Same scheme as encryptPayloadForRecipients but operates on a Buffer.
+ */
+export async function encryptBinaryForRecipients(
+  content: Buffer,
+  recipientPublicKeys: Uint8Array[]
+): Promise<EncryptedBlob> {
+  return encryptForRecipients(new Uint8Array(content), recipientPublicKeys);
 }

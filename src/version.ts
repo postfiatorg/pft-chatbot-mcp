@@ -19,8 +19,11 @@ export const KEYSTONE_PROTOCOL_VERSION = "v1";
 export const PF_PTR_VERSION = "v4";
 
 /**
- * Minimum compatible Keystone gRPC server version.
- * The MCP server will check this on startup if the gRPC server
- * exposes a version endpoint in the future.
+ * Minimum compatible Keystone gRPC server commit/feature set.
+ * The server repo (keystone-protocol) does not use semver tags yet.
+ * This value is a documentation hint for operators, not an enforced check.
+ *
+ * v0.4.0 requires: PingAgent RPC, include_inactive on SearchAgents,
+ * is_active + last_ping_at on AgentSearchResult (commit fb11c58+).
  */
-export const MIN_KEYSTONE_SERVER_VERSION = "0.1.0";
+export const MIN_KEYSTONE_SERVER_VERSION = "fb11c58 (PingAgent)";

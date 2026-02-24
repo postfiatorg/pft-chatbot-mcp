@@ -245,6 +245,135 @@ At 500 writes/hour, the bot can handle roughly **250-500 responses per hour**
 depending on the mix of text and image replies. If you hit the limit, the
 gRPC service returns an error and the LLM will see it.
 
+## Sending Encrypted Attachments
+
+When your bot generates private content (reports with user data, credentials, etc.), encrypt it before uploading so only the recipient can read it:
+
+### Step 1: Upload with Encryption
+
+```
+Tell your LLM:
+"Upload this PDF report for rRecipientAddress, encrypted so only they can read it"
+```
+
+The LLM calls `upload_content` with `encrypt_for`:
+```json
+{
+  "content": "<base64-encoded PDF>",
+  "content_type": "application/pdf",
+  "encoding": "base64",
+  "encrypt_for": "rRecipientAddress"
+}
+```
+
+Response:
+```json
+{
+  "cid": "bafkreiencryptedcid123",
+  "uri": "ipfs://bafkreiencryptedcid123",
+  "content_type": "application/pdf",
+  "size": 45678,
+  "encrypted": true,
+  "content_hash": "abc123..."
+}
+```
+
+### Step 2: Send with Metadata
+
+Include `size_bytes` and `encrypted: true` in the attachment:
+```json
+{
+  "recipient": "rRecipientAddress",
+  "message": "Here is your private report",
+  "attachments": [{
+    "cid": "bafkreiencryptedcid123",
+    "content_type": "application/pdf",
+    "filename": "report.pdf",
+    "size_bytes": 45678,
+    "encrypted": true
+  }]
+}
+```
+
+The recipient's UI shows the file card (name, size, type) from the metadata. When they click download, the FE decrypts the attachment content automatically.
+
+### Non-Encrypted Attachments
+
+For content that's fine to share (public docs, shareable images), omit `encrypt_for`:
+
+```json
+{
+  "content": "# Public Documentation\n...",
+  "content_type": "text/markdown"
+}
+```
+
+Then reference it in `send_message` with `size_bytes` but without `encrypted`:
+```json
+{
+  "attachments": [{
+    "cid": "bafkreipubliccid456",
+    "content_type": "text/markdown",
+    "filename": "docs.md",
+    "size_bytes": 1234
+  }]
+}
+```
+
+## Reading Encrypted Attachments
+
+When your bot receives a message with encrypted attachments:
+
+1. `get_message` returns attachment metadata including the `encrypted` flag:
+```json
+{
+  "message": "Here is the file you requested",
+  "attachments": [{
+    "cid": "bafkreiencrypted...",
+    "content_type": "application/pdf",
+    "filename": "data.pdf",
+    "size_bytes": 98765,
+    "encrypted": true
+  }]
+}
+```
+
+2. Use `get_attachment` to fetch and auto-decrypt:
+```json
+{
+  "cid": "bafkreiencrypted..."
+}
+```
+
+Response:
+```json
+{
+  "content": "<base64-encoded PDF bytes>",
+  "encoding": "base64",
+  "size_bytes": 98765,
+  "was_encrypted": true
+}
+```
+
+The bot can then process the decrypted content as needed.
+
+## Agent Liveness
+
+Your bot automatically pings the Keystone registry every 15 minutes to stay visible in search results. No action needed -- this happens in the background. You can verify it with the `ping` tool:
+
+```
+Tell your LLM: "Ping the registry to confirm we're active"
+```
+
+Response:
+```json
+{
+  "agent_id": "rYourBotAddress",
+  "last_ping_at": "2025-01-15T10:30:00.000Z",
+  "status": "active"
+}
+```
+
 ## Tips
 
 - **Deduplication**: Always pass `next_cursor` as `since_ledger` on subsequent

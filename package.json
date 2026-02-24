@@ -1,6 +1,6 @@
 {
   "name": "@postfiatorg/pft-chatbot-mcp",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "MCP server for enabling chatbots to work within Post Fiat Task Node Messages UI",
   "type": "module",
   "main": "dist/index.js",
@@ -11,7 +11,8 @@
   "files": [
     "dist",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "start": "tsx src/index.ts",
@@ -19,6 +20,8 @@
     "build": "tsc && npm run copy-protos",
     "copy-protos": "rm -rf dist/grpc/protos && cp -r src/grpc/protos dist/grpc/protos",
     "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "npm run build"
   },
   "repository": {
@@ -54,7 +57,8 @@
     "@types/libsodium-wrappers": "^0.7.14",
     "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
   },
   "engines": {
     "node": ">=20.0.0"

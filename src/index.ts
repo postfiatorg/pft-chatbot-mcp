@@ -6,6 +6,7 @@ import { loadConfig } from "./config.js";
 import { deriveBotKeypair } from "./crypto/keys.js";
 import { KeystoneClient } from "./grpc/client.js";
 import { MCP_VERSION, KEYSTONE_PROTOCOL_VERSION, PF_PTR_VERSION } from "./version.js";
+import { startPingInterval } from "./liveness/ping.js";
 
 // Tool implementations
 import {
@@ -33,6 +34,11 @@ import { getThreadSchema, executeGetThread } from "./tools/get_thread.js";
 import { executeCheckBalance } from "./tools/check_balance.js";
 import { sendPftSchema, executeSendPft } from "./tools/send_pft.js";
 import { executeGetWalletInfo } from "./tools/get_wallet_info.js";
+import { executePing } from "./tools/ping.js";
+import {
+  getAttachmentSchema,
+  executeGetAttachment,
+} from "./tools/get_attachment.js";
 
 async function main() {
   // Try to load configuration -- if BOT_SEED is not set, the server starts
@@ -41,6 +47,7 @@ async function main() {
   let keypair: Awaited<ReturnType<typeof deriveBotKeypair>> | null = null;
   let grpcClient: KeystoneClient | null = null;
   let setupMode = false;
+  let stopPing: (() => void) | null = null;
 
   try {
     config = loadConfig();
@@ -103,7 +110,7 @@ async function main() {
 
     server.tool(
       "get_message",
-      "Fetch and decrypt a specific message by transaction hash or IPFS CID. Returns the full decrypted message content.",
+      "Fetch and decrypt a specific message by transaction hash or IPFS CID. Returns the full decrypted message content including attachment metadata (cid, content_type, filename, size_bytes, encrypted flag).",
       {
         tx_hash: getMessageSchema.shape.tx_hash,
         cid: getMessageSchema.shape.cid,
@@ -123,7 +130,7 @@ async function main() {
 
     server.tool(
       "send_message",
-      "Send an encrypted message to a PFTL address. Encrypts the content, uploads to IPFS, and submits a Payment transaction on-chain with PFT.",
+      "Send an encrypted message to a PFTL address. Encrypts the content, uploads to IPFS, and submits a Payment transaction on-chain. Attachments should include size_bytes (from upload_content response) and encrypted: true if uploaded with encrypt_for.",
       {
         recipient: sendMessageSchema.shape.recipient,
         message: sendMessageSchema.shape.message,
@@ -154,7 +161,7 @@ async function main() {
 
     server.tool(
       "register_bot",
-      "Register or update this bot in the Keystone agent registry. Each wallet has exactly one bot registration (wallet address = agent ID). Calling again updates the existing registration. Auto-provisions an API key on first use.",
+      "Register or update this bot in the Keystone agent registry. Each wallet has exactly one bot registration (wallet address = agent ID). Calling again updates the existing registration. Auto-provisions an API key on first use. Also acts as a heartbeat ping.",
       {
         name: registerBotSchema.shape.name,
         description: registerBotSchema.shape.description,
@@ -186,11 +193,12 @@ async function main() {
 
     server.tool(
       "search_bots",
-      "Search the Keystone agent registry for registered bots by name, description, or capabilities.",
+      "Search the Keystone agent registry for registered bots. By default only shows active bots (pinged within 20 min). Set include_inactive to see all bots.",
       {
         query: searchBotsSchema.shape.query,
         capabilities: searchBotsSchema.shape.capabilities,
         limit: searchBotsSchema.shape.limit,
+        include_inactive: searchBotsSchema.shape.include_inactive,
       },
       async (params) => {
         try {
@@ -245,19 +253,41 @@ async function main() {
 
     server.tool(
       "upload_content",
-      "Upload arbitrary content to IPFS via the Keystone gRPC write gate. Returns the CID and content descriptor.",
+      "Upload content to IPFS via Keystone gRPC (max 10 MB). Returns CID, size, and content_type. For private attachments, set encrypt_for to a recipient wallet address to encrypt the content before uploading -- then pass encrypted: true and size_bytes when referencing it in send_message.",
       {
         content: uploadContentSchema.shape.content,
         content_type: uploadContentSchema.shape.content_type,
         encoding: uploadContentSchema.shape.encoding,
+        encrypt_for: uploadContentSchema.shape.encrypt_for,
       },
       async (params) => {
         try {
           const result = await executeUploadContent(
             config,
             grpcClient,
-            params
+            params,
+            keypair
           );
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return {
+            content: [{ type: "text", text: `Error: ${err.message}` }],
+            isError: true,
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "get_attachment",
+      "Fetch an attachment from IPFS by CID. Automatically detects and decrypts encrypted attachments (uploaded with encrypt_for). Returns the raw content as base64 or utf8.",
+      {
+        cid: getAttachmentSchema.shape.cid,
+        encoding: getAttachmentSchema.shape.encoding,
+      },
+      async (params) => {
+        try {
+          const result = await executeGetAttachment(config, keypair, params);
           return { content: [{ type: "text", text: result }] };
         } catch (err: any) {
           return {
@@ -344,11 +374,49 @@ async function main() {
         }
       }
     );
+
+    server.tool(
+      "ping",
+      "Send a liveness heartbeat to the Keystone agent registry. The bot does this automatically every 15 minutes, but you can call it manually to confirm connectivity. Agents that don't ping within 20 minutes are hidden from search.",
+      {},
+      async () => {
+        try {
+          const result = await executePing(keypair, grpcClient);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return {
+            content: [{ type: "text", text: `Error: ${err.message}` }],
+            isError: true,
+          };
+        }
+      }
+    );
+
   }
 
   // Connect via stdio transport (standard MCP protocol)
   const transport = new StdioServerTransport();
   await server.connect(transport);
+
+  // Start background liveness ping AFTER transport is connected
+  if (config && grpcClient && config.pingIntervalMs > 0) {
+    if (config.keystoneApiKey) {
+      stopPing = startPingInterval(grpcClient, config.pingIntervalMs);
+    } else {
+      process.stderr.write(
+        `[ping] Skipped – no API key yet. Run register_bot first, then restart.\n`
+      );
+    }
+  }
+
+  // Graceful shutdown
+  const shutdown = () => {
+    stopPing?.();
+    grpcClient?.close();
+    process.exit(0);
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 
   // Log startup info to stderr (stdout is reserved for MCP protocol)
   if (setupMode) {
@@ -369,6 +437,7 @@ async function main() {
     process.stderr.write(`Chain RPC: ${config!.pftlRpcUrl}\n`);
     process.stderr.write(`Keystone gRPC: ${config!.keystoneGrpcUrl}\n`);
     process.stderr.write(`IPFS Gateway: ${config!.ipfsGatewayUrl}\n`);
+    process.stderr.write(`Ping interval: ${config!.pingIntervalMs}ms\n`);
   }
 }
 

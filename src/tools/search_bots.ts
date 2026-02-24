@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Config } from "../config.js";
 import type { KeystoneClient } from "../grpc/client.js";
+import { timestampToIso } from "../liveness/ping.js";
 
 export const searchBotsSchema = z.object({
   query: z
@@ -17,6 +18,10 @@ export const searchBotsSchema = z.object({
     .max(100)
     .optional()
     .describe("Maximum number of results (default: 20)"),
+  include_inactive: z
+    .boolean()
+    .optional()
+    .describe("If true, include bots that have not pinged recently (inactive). Default: false (only active bots)."),
 });
 
 export type SearchBotsParams = z.infer<typeof searchBotsSchema>;
@@ -26,7 +31,6 @@ export async function executeSearchBots(
   grpcClient: KeystoneClient,
   params: SearchBotsParams
 ): Promise<string> {
-  // Normalize capability URIs
   const capabilities = params.capabilities?.map((cap) =>
     cap.startsWith("http")
       ? cap
@@ -36,7 +40,8 @@ export async function executeSearchBots(
   const result = await grpcClient.searchAgents(
     params.query,
     capabilities,
-    params.limit || 20
+    params.limit || 20,
+    params.include_inactive
   );
 
   if (!result.results || result.results.length === 0) {
@@ -47,7 +52,7 @@ export async function executeSearchBots(
     agent_id: r.agentId,
     name: r.agentCard?.name || "",
     description: r.agentCard?.description || "",
-    wallet_address: "",
+    wallet_address: r.agentId,
     capabilities:
       r.keystoneCapabilities?.supportedSemanticCapabilities || [],
     supported_commands: (r.supportedCommands || []).map((cmd) => ({
@@ -60,6 +65,8 @@ export async function executeSearchBots(
     icon_emoji: r.iconEmoji || "",
     icon_color_hex: r.iconColorHex || "",
     min_cost_first_message_drops: r.minCostFirstMessageDrops || "0",
+    is_active: r.isActive ?? true,
+    last_ping_at: timestampToIso(r.lastPingAt),
   }));
 
   return JSON.stringify(
