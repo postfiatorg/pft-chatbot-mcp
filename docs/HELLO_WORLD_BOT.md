@@ -143,7 +143,8 @@ send_message({
   attachments: [{
     cid: "bafkImage...",
     content_type: "image/png",
-    filename: "hello-world.png"
+    filename: "hello-world.png",
+    size_bytes: 24576
   }],
   reply_to_tx: "D4E5F6..."
 })
@@ -297,6 +298,8 @@ Include `size_bytes` and `encrypted: true` in the attachment:
 
 The recipient's UI shows the file card (name, size, type) from the metadata. When they click download, the FE decrypts the attachment content automatically.
 
+> **Note on TaskNode visibility**: When `share_with_tasknode` is `true` (default), the TaskNode can read the message text and see attachment metadata (filename, size, type), but **cannot decrypt the attachment file bytes** -- those are encrypted only for the bot and the recipient. This is the expected behavior: the agent shares the conversation context with the server while keeping actual file contents private.
+
 ### Non-Encrypted Attachments
 
 For content that's fine to share (public docs, shareable images), omit `encrypt_for`:
@@ -388,3 +391,6 @@ Response:
 - **Image generation**: The LLM uses its own image generation capabilities.
   If your LLM client doesn't support image generation, you can skip the
   image tier or use an external API and pass the result as base64.
+- **TaskNode sharing**: By default, messages include a recipient shard for the
+  TaskNode (server-side previews and task processing). Set `share_with_tasknode: false`
+  on `send_message` if your bot handles sensitive data that should be fully private.

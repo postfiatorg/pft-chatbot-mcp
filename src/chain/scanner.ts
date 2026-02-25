@@ -3,6 +3,7 @@ import {
   identifyMemoType,
   decodePfPointer,
   decodeKeystoneEnvelope,
+  extractCidFromCoreMessage,
   type DecodedMemo,
   type MemoType,
 } from "./pointer.js";
@@ -24,7 +25,7 @@ export interface ScannedMessage {
   /** Issued currency amount (for non-PFT tokens on the PFTL chain, null for native PFT) */
   issuedCurrencyAmount: IssuedCurrencyAmount | null;
   memoType: MemoType;
-  /** CID from pf.ptr pointer, or null for keystone envelopes */
+  /** CID extracted from pf.ptr pointer or keystone envelope metadata/message */
   cid: string | null;
   threadId: string | null;
   contentKind: string | null;
@@ -155,8 +156,10 @@ export async function scanMessages(
           isEncrypted =
             envelope.encryption === "ENCRYPTION_MODE_PUBLIC_KEY" ||
             envelope.encryption === "ENCRYPTION_MODE_PROTECTED";
-          // Extract CID from metadata if present
           cid = envelope.metadata?.cid || null;
+          if (!cid && envelope.message && envelope.message.length > 0) {
+            cid = await extractCidFromCoreMessage(envelope.message);
+          }
         }
       } catch {
         // Skip memos we can't decode

@@ -48,3 +48,45 @@ decrypted ciphertext yields raw file bytes rather than a UTF-8 JSON string.
 
 Attachment metadata in the message payload includes `size_bytes` (original size)
 and `encrypted: true` when applicable, matching the pftasks FE `AttachmentRenderer` expectations.
+
+## Keystone Envelope Format (v0.5.0+)
+
+As of v0.5.0, `send_message` emits `keystone v1` envelope memos instead of `pf.ptr v4` pointers.
+The envelope structure is a protobuf-encoded `KeystoneEnvelope` containing:
+
+- `version: 1`
+- `message_type: 1` (MESSAGE_TYPE_CORE) — **must be numeric**, not string
+- `encryption: 3` (ENCRYPTION_MODE_PUBLIC_KEY) — **must be numeric**, not string
+- `content_hash`: SHA-256 of the encrypted blob (bytes)
+- `message`: serialized `KeystoneCoreMessage` containing a `KeystoneContentDescriptor`
+  with `uri: "ipfs://<cid>"`, `content_type`, `content_length`, `content_hash`
+- `metadata: { cid: "<bare CID>" }`
+
+The memo fields are: `MemoType = "keystone"` (hex), `MemoFormat = "v1"` (hex),
+`MemoData = <protobuf bytes>` (hex).
+
+The scanner reads both `pf.ptr v4` and `keystone v1` formats. When a keystone
+envelope's `metadata.cid` is missing, the scanner falls back to extracting the
+CID from the embedded `KeystoneCoreMessage.content_descriptor.uri`.
+
+## TaskNode Sharing (v0.5.0+)
+
+By default, `send_message` encrypts the message blob for 3 recipients: the bot,
+the recipient, and the TaskNode. This allows the TaskNode to decrypt messages for
+server-side previews and task processing.
+
+Controlled by:
+- `TASKNODE_ENCRYPTION_PUBKEY` env var: base64-encoded X25519 public key (defaults
+  to the testnet TaskNode key). Set to `"none"` or `""` to disable.
+- `share_with_tasknode` parameter on `send_message` (default `true`): per-message control.
+
+When `share_with_tasknode` is false, the plaintext payload's `content_type` is forced to
+`"encrypted"` to signal the TaskNode should not attempt decryption (matching pftasks
+frontend behavior).
+
+Privacy tiers when combining `share_with_tasknode` with `encrypt_for` on attachments:
+- **Fully shared** (`share_with_tasknode: true`, no `encrypt_for`): TaskNode reads message + file bytes
+- **Message shared, files private** (`share_with_tasknode: true`, `encrypt_for` set): TaskNode
+  reads message text and file metadata but cannot decrypt the attachment content at the CID
+  (encrypted only for bot + recipient, not the TaskNode)
+- **Fully private** (`share_with_tasknode: false`): TaskNode cannot decrypt anything

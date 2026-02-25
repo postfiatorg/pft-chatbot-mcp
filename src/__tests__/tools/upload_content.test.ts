@@ -47,6 +47,7 @@ describe("executeUploadContent size guard", () => {
     const dummyConfig = {
       botSeed: "", pftlRpcUrl: "", pftlWssUrl: "",
       ipfsGatewayUrl: "", keystoneGrpcUrl: "", keystoneApiKey: null, pingIntervalMs: 0,
+      tasknodeEncryptionKey: null, tasknodeKeySource: null,
     };
     const mockGrpc = {} as any;
     await expect(

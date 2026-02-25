@@ -16,6 +16,10 @@ export interface Config {
   keystoneApiKey: string | null;
   /** Ping interval in ms (default 900000 = 15 min, 0 = disabled) */
   pingIntervalMs: number;
+  /** Decoded X25519 public key for tasknode encryption (32 bytes), or null if disabled */
+  tasknodeEncryptionKey: Uint8Array | null;
+  /** Human-readable label for startup log: "testnet default" | "custom key" | null */
+  tasknodeKeySource: string | null;
 }
 
 const API_KEY_CACHE_FILE = ".keystone-api-key";
@@ -70,6 +74,30 @@ function loadBotSeed(): string {
   );
 }
 
+const TESTNET_TASKNODE_PUBKEY = "knyyRfO9ws9JmIHjOA7v0x4+hjflnKeGIhLVS/G0BwM=";
+const X25519_KEY_LENGTH = 32;
+
+function loadTasknodeKey(): { key: Uint8Array | null; source: string | null } {
+  const envVal = process.env.TASKNODE_ENCRYPTION_PUBKEY;
+
+  if (envVal === "" || envVal === "none") {
+    return { key: null, source: null };
+  }
+
+  const b64 = envVal || TESTNET_TASKNODE_PUBKEY;
+  const source = envVal ? "custom key" : "testnet default";
+
+  const decoded = Buffer.from(b64, "base64");
+  if (decoded.length !== X25519_KEY_LENGTH) {
+    throw new Error(
+      `Invalid TASKNODE_ENCRYPTION_PUBKEY: expected ${X25519_KEY_LENGTH} bytes after base64 decode, ` +
+        `got ${decoded.length}. Set to "none" to disable tasknode sharing.`
+    );
+  }
+
+  return { key: new Uint8Array(decoded), source };
+}
+
 function parsePingInterval(envVal: string | undefined): number {
   if (!envVal) return 900_000;
   const parsed = parseInt(envVal, 10);
@@ -88,6 +116,9 @@ export function loadConfig(): Config {
   const keystoneApiKey =
     process.env.KEYSTONE_API_KEY || loadCachedApiKey() || null;
 
+  const { key: tasknodeEncryptionKey, source: tasknodeKeySource } =
+    loadTasknodeKey();
+
   return {
     botSeed,
     pftlRpcUrl:
@@ -101,5 +132,7 @@ export function loadConfig(): Config {
       process.env.KEYSTONE_GRPC_URL || "keystone-grpc.postfiat.org:443",
     keystoneApiKey,
     pingIntervalMs: parsePingInterval(process.env.PING_INTERVAL_MS),
+    tasknodeEncryptionKey,
+    tasknodeKeySource,
   };
 }

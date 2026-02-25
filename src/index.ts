@@ -436,6 +436,11 @@ async function main() {
     process.stderr.write(`Keystone gRPC: ${config!.keystoneGrpcUrl}\n`);
     process.stderr.write(`IPFS Gateway: ${config!.ipfsGatewayUrl}\n`);
     process.stderr.write(`Ping interval: ${config!.pingIntervalMs}ms\n`);
+    if (config!.tasknodeEncryptionKey) {
+      process.stderr.write(`Tasknode sharing: enabled (${config!.tasknodeKeySource})\n`);
+    } else {
+      process.stderr.write(`Tasknode sharing: disabled\n`);
+    }
   }
 }
 

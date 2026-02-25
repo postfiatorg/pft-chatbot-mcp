@@ -28,6 +28,8 @@ const dummyConfig = {
   pftlRpcUrl: "",
   pftlWssUrl: "",
   ipfsGatewayUrl: "https://example.com",
+  tasknodeEncryptionKey: null,
+  tasknodeKeySource: null,
   keystoneGrpcUrl: "",
   keystoneApiKey: null,
   pingIntervalMs: 0,

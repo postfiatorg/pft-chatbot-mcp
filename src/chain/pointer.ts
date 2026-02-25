@@ -55,12 +55,12 @@ export type DecodedMemo = DecodedPfPointer | DecodedKeystoneEnvelope | null;
 
 let pfPointerType: protobuf.Type | null = null;
 let keystoneEnvelopeType: protobuf.Type | null = null;
+let keystoneCoreMessageType: protobuf.Type | null = null;
+let keystoneContentDescriptorType: protobuf.Type | null = null;
 
 async function loadProtos(): Promise<void> {
   if (pfPointerType && keystoneEnvelopeType) return;
 
-  // Use a custom Root so proto imports (e.g. "pf/common/v4/common.proto")
-  // resolve relative to PROTO_DIR, not relative to the importing file.
   const pfRoot = new protobuf.Root();
   pfRoot.resolvePath = (_origin: string, target: string) =>
     resolve(PROTO_DIR, target);
@@ -72,6 +72,8 @@ async function loadProtos(): Promise<void> {
     resolve(PROTO_DIR, target);
   await ksRoot.load(resolve(PROTO_DIR, "keystone/v1/core/envelope.proto"));
   keystoneEnvelopeType = ksRoot.lookupType("keystone.v1.core.KeystoneEnvelope");
+  keystoneCoreMessageType = ksRoot.lookupType("keystone.v1.core.KeystoneCoreMessage");
+  keystoneContentDescriptorType = ksRoot.lookupType("keystone.v1.core.KeystoneContentDescriptor");
 }
 
 /**
@@ -166,6 +168,9 @@ export async function decodeKeystoneEnvelope(
 /**
  * Build a pf.ptr.v4.Pointer memo for sending messages.
  * Returns hex-encoded memo fields ready for PFTL transaction.
+ *
+ * @deprecated v0.5.0 — use buildKeystoneEnvelopeMemo for new messages.
+ *   Kept for backward-compat tooling; the scanner still reads both formats.
  */
 export async function buildPfPointerMemo(input: {
   cid: string;
@@ -181,8 +186,6 @@ export async function buildPfPointerMemo(input: {
 }> {
   await loadProtos();
 
-  // Resolve enum string names to numeric values.
-  // protobufjs verify/create expect numbers for enum fields, not strings.
   const targetEnum = pfPointerType!.parent!.lookupEnum("Target");
   const kindEnum = pfPointerType!.root.lookupEnum("pf.common.v4.ContentKind");
 
@@ -210,4 +213,76 @@ export async function buildPfPointerMemo(input: {
     memoFormatHex: PF_PTR_MEMO_FORMAT_HEX,
     memoDataHex: Buffer.from(bytes).toString("hex"),
   };
+}
+
+/**
+ * Build a Keystone v1 envelope memo, matching the pftasks frontend format.
+ *
+ * The envelope wraps a KeystoneCoreMessage containing a KeystoneContentDescriptor
+ * that points at the encrypted blob on IPFS. The envelope itself is unencrypted
+ * and placed directly in the XRPL memo.
+ */
+export async function buildKeystoneEnvelopeMemo(input: {
+  cid: string;
+  contentHash: string;
+  contentLength: number;
+  contentType?: string;
+}): Promise<{
+  memoTypeHex: string;
+  memoFormatHex: string;
+  memoDataHex: string;
+}> {
+  await loadProtos();
+
+  const contentHashBytes = Buffer.from(input.contentHash, "hex");
+
+  const coreMsg = keystoneCoreMessageType!.create({
+    contentDescriptor: keystoneContentDescriptorType!.create({
+      uri: `ipfs://${input.cid}`,
+      contentType: input.contentType || "application/json",
+      contentLength: input.contentLength || 0,
+      contentHash: contentHashBytes,
+    }),
+  });
+  const coreBytes = keystoneCoreMessageType!.encode(coreMsg).finish();
+
+  const envelope = keystoneEnvelopeType!.create({
+    version: 1,
+    contentHash: contentHashBytes,
+    messageType: 1, // MESSAGE_TYPE_CORE
+    encryption: 3, // ENCRYPTION_MODE_PUBLIC_KEY
+    message: coreBytes,
+    metadata: { cid: input.cid },
+  });
+  const envelopeBytes = keystoneEnvelopeType!.encode(envelope).finish();
+
+  return {
+    memoTypeHex: KEYSTONE_MEMO_TYPE_HEX,
+    memoFormatHex: KEYSTONE_MEMO_FORMAT_HEX,
+    memoDataHex: Buffer.from(envelopeBytes).toString("hex"),
+  };
+}
+
+/**
+ * Try to extract a CID from a KeystoneCoreMessage embedded in envelope.message bytes.
+ * Used as a fallback when envelope.metadata.cid is missing.
+ */
+export async function extractCidFromCoreMessage(
+  messageBytes: Buffer
+): Promise<string | null> {
+  if (!messageBytes || messageBytes.length === 0) return null;
+  try {
+    await loadProtos();
+    const raw = keystoneCoreMessageType!.decode(messageBytes);
+    const decoded = keystoneCoreMessageType!.toObject(raw, {
+      defaults: true,
+    }) as any;
+    const uri: string = decoded.contentDescriptor?.uri || "";
+    if (uri.startsWith("ipfs://")) {
+      return uri.slice(7);
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }

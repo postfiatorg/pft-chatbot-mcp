@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import type { Config } from "../config.js";
 import type { BotKeypair } from "../crypto/keys.js";
 import type { KeystoneClient } from "../grpc/client.js";
 import { encryptPayloadForRecipients } from "../crypto/encrypt.js";
 import { resolveRecipientKey } from "../crypto/resolve_key.js";
-import { buildPfPointerMemo, POINTER_FLAGS } from "../chain/pointer.js";
+import { buildKeystoneEnvelopeMemo } from "../chain/pointer.js";
 import { preparePayment, signAndSubmit } from "../chain/submitter.js";
 
 export const sendMessageSchema = z.object({
@@ -44,6 +45,14 @@ export const sendMessageSchema = z.object({
     .string()
     .optional()
     .describe("Thread ID to continue a conversation"),
+  share_with_tasknode: z
+    .boolean()
+    .optional()
+    .describe(
+      "Share message with the TaskNode for task processing and server-side previews. " +
+        "When true (default), the encrypted blob includes a recipient shard for the TaskNode. " +
+        "Set false for fully private end-to-end encrypted messages."
+    ),
 });
 
 export type SendMessageParams = z.infer<typeof sendMessageSchema>;
@@ -75,12 +84,18 @@ export async function executeSendMessage(
 
   const amountPft = (Number(amountDrops) / 1_000_000).toString();
 
-  // 3. Build plaintext payload (matches pftasks format)
+  // 3. Determine tasknode sharing
+  const shareWithTasknode =
+    params.share_with_tasknode !== false && config.tasknodeEncryptionKey != null;
+
+  // 4. Build plaintext payload (matches pftasks format)
   const payload: Record<string, unknown> = {
     thread_id: params.thread_id || "",
     sender_address: keypair.address,
     recipient_address: params.recipient,
-    content_type: params.content_type || "text",
+    content_type: shareWithTasknode
+      ? params.content_type || "text"
+      : "encrypted",
     message: params.message,
     amount_drops: amountDrops,
     created_at: new Date().toISOString(),
@@ -100,32 +115,38 @@ export async function executeSendMessage(
 
   const plaintext = JSON.stringify(payload);
 
-  // 4. Encrypt for recipient + bot (2 shards)
-  const encryptedBlob = await encryptPayloadForRecipients(plaintext, [
-    keypair.x25519PublicKey, // bot can read its own messages
-    recipientKey, // recipient can decrypt
-  ]);
+  // 5. Encrypt for bot + recipient (+ optionally tasknode)
+  const recipientKeys: Uint8Array[] = [
+    keypair.x25519PublicKey,
+    recipientKey,
+  ];
+  if (shareWithTasknode) {
+    recipientKeys.push(config.tasknodeEncryptionKey!);
+  }
+  const encryptedBlob = await encryptPayloadForRecipients(
+    plaintext,
+    recipientKeys
+  );
 
-  // 5. Upload encrypted blob to IPFS via gRPC
+  // 6. Upload encrypted blob to IPFS via gRPC
   const blobBytes = Buffer.from(JSON.stringify(encryptedBlob), "utf8");
   const storeResult = await grpcClient.storeContent(
     blobBytes,
     "application/json"
   );
 
-  // Extract CID from the descriptor URI (ipfs://bafk...)
   const cid = storeResult.descriptor.uri.replace("ipfs://", "");
 
-  // 6. Build pf.ptr.v4 pointer memo
-  const memo = await buildPfPointerMemo({
+  // 7. Build Keystone v1 envelope memo
+  const contentHash = createHash("sha256").update(blobBytes).digest("hex");
+  const memo = await buildKeystoneEnvelopeMemo({
     cid,
-    kind: "CHAT",
-    schema: 1,
-    threadId: params.thread_id,
-    flags: POINTER_FLAGS.encrypted,
+    contentHash,
+    contentLength: blobBytes.length,
+    contentType: "application/json",
   });
 
-  // 7. Prepare the Payment transaction
+  // 8. Prepare the Payment transaction
   const prepared = await preparePayment(
     config,
     keypair.wallet,
@@ -134,7 +155,7 @@ export async function executeSendMessage(
     memo
   );
 
-  // 8. Sign and submit
+  // 9. Sign and submit
   const result = await signAndSubmit(config, keypair.wallet, prepared.txJson);
 
   if (result.result !== "tesSUCCESS") {

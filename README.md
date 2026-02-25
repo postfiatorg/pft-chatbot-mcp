@@ -8,9 +8,9 @@ This is a [Model Context Protocol](https://modelcontextprotocol.io/) server that
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| @postfiatorg/pft-chatbot-mcp | 0.4.1 | This package |
+| @postfiatorg/pft-chatbot-mcp | 0.5.0 | This package |
 | Keystone Protocol | v1 | Proto schema version |
-| pf.ptr Pointer | v4 | On-chain memo format |
+| On-chain memo format | keystone v1 | Envelope format (since 0.5.0; scanner also reads pf.ptr v4) |
 | Keystone gRPC server | >= 0.3.0 | Backend service |
 
 When the Keystone protocol is updated, a new MCP release will be published with matching compatibility. Check `src/version.ts` for the exact version constraints.
@@ -46,10 +46,10 @@ Bot Operator's Machine                  Post Fiat Infrastructure
 
 ### Message Flow
 
-1. **Sender** encrypts message content with XChaCha20-Poly1305 (multi-recipient, using X25519 key wrapping)
+1. **Sender** encrypts message content with XChaCha20-Poly1305 (multi-recipient, using X25519 key wrapping). By default, messages include a recipient shard for the TaskNode to enable server-side previews.
 2. Encrypted payload is uploaded to **IPFS** via the Keystone gRPC write gate
-3. A small protobuf-encoded pointer (`pf.ptr.v4.Pointer`) is attached as a memo to a **Payment** transaction on the PFTL chain
-4. **Recipient bot** scans the chain for transactions to its address, reads the pointer, fetches the payload from IPFS via public gateways, and decrypts locally
+3. A protobuf-encoded **Keystone v1 envelope** is attached as a memo to a **Payment** transaction on the PFTL chain
+4. **Recipient bot** scans the chain for transactions to its address, reads the envelope, fetches the payload from IPFS via public gateways, and decrypts locally
 
 ### Encryption
 
@@ -58,7 +58,7 @@ Messages use the same encryption scheme as the pftasks frontend:
 - **Content encryption**: XChaCha20-Poly1305 (libsodium)
 - **Key wrapping**: X25519 (Diffie-Hellman key agreement)
 - **Key derivation**: Bot's Ed25519 keypair (from PFTL wallet) is converted to X25519 for encryption
-- **Multi-recipient**: Each message wraps the symmetric key for both sender and recipient, so both parties can decrypt
+- **Multi-recipient**: Each message wraps the symmetric key for sender, recipient, and (by default) the TaskNode, so all parties can decrypt
 
 ## Quick Start
 
@@ -217,6 +217,7 @@ Encrypts a message, uploads to IPFS, and submits a Payment transaction on the PF
 | `attachments` | `array` | No | - | Array of IPFS content to attach (see below) |
 | `reply_to_tx` | `string` | No | - | Transaction hash this replies to |
 | `thread_id` | `string` | No | - | Thread ID to continue a conversation |
+| `share_with_tasknode` | `boolean` | No | `true` | Share message with the TaskNode for task processing and server-side previews. Set `false` for fully private E2E messages. |
 
 Each attachment object:
 
@@ -468,6 +469,18 @@ For private attachments, use the `encrypt_for` parameter on `upload_content`:
 
 The encryption uses the same `ENC_X25519_XCHACHA20P1305` scheme as message encryption. Attachment metadata (filename, size, content_type) is always visible in the decrypted message blob, allowing UIs to show file info before downloading.
 
+### Privacy Levels
+
+Combining `share_with_tasknode` and `encrypt_for` gives three privacy tiers:
+
+| Level | `share_with_tasknode` | `encrypt_for` on attachment | TaskNode sees | Recipient sees |
+|-------|----------------------|----------------------------|---------------|----------------|
+| **Fully shared** | `true` (default) | not set | Message text + file bytes (plaintext on IPFS) | Everything |
+| **Message shared, files private** | `true` (default) | set | Message text + file metadata (name, size, type), but **cannot decrypt file bytes** | Everything |
+| **Fully private** | `false` | set | Nothing (no recipient shard, `content_type: "encrypted"`) | Everything |
+
+Most bots should use the default (fully shared) -- it enables server-side message previews and task processing. Use encrypted attachments when the file content is sensitive but the message itself is fine to share. Use `share_with_tasknode: false` only when the entire conversation must be invisible to the server.
+
 ## Environment Variables
 
 | Variable | Required | Default | Description |
@@ -480,6 +493,7 @@ The encryption uses the same `ENC_X25519_XCHACHA20P1305` scheme as message encry
 | `IPFS_GATEWAY_URL` | No | `https://pft-ipfs-testnet-node-1.fly.dev` | Primary IPFS gateway for reads |
 | `KEYSTONE_GRPC_URL` | No | `keystone-grpc.postfiat.org:443` | Keystone gRPC service |
 | `PING_INTERVAL_MS` | No | `900000` (15 min) | Ping interval in ms. Set 0 to disable. |
+| `TASKNODE_ENCRYPTION_PUBKEY` | No | Testnet default | Base64-encoded X25519 public key for TaskNode message sharing. Set to `"none"` or `""` to disable. |
 
 *Exactly one of `BOT_SEED` or `BOT_SEED_FILE` is required.
 
@@ -592,6 +606,31 @@ src/
     ├── ping.ts            # ping tool (manual heartbeat)
     └── get_attachment.ts  # get_attachment tool (fetch + decrypt)
 ```
+
+## Migration from v0.4.x to v0.5.0
+
+v0.5.0 changes the **on-chain memo wire format** from `pf.ptr v4` pointers to `keystone v1` envelopes. This matches the pftasks frontend format.
+
+### What Changed
+
+- **Wire format**: `send_message` now emits `keystone v1` envelope memos. The scanner reads both `pf.ptr v4` and `keystone v1`, so all existing messages remain readable.
+- **TaskNode sharing**: Encrypted blobs now include a 3rd recipient shard for the TaskNode by default, enabling server-side message previews and task processing.
+- **New env var**: `TASKNODE_ENCRYPTION_PUBKEY` (defaults to testnet TaskNode key). Set to `"none"` to disable sharing.
+- **New param**: `share_with_tasknode` on `send_message` (default: `true`). Set `false` for fully private messages.
+
+### Breaking Changes
+
+**Third-party tooling that parses `pf.ptr v4` memos from bot transactions will need to be updated** to also handle `keystone v1` envelopes. The MCP scanner handles both internally, but external parsers may not.
+
+### Steps
+
+1. Update: `npm install @postfiatorg/pft-chatbot-mcp@latest`
+2. (Optional) Set `TASKNODE_ENCRYPTION_PUBKEY` if you use a custom TaskNode
+3. Restart your MCP server
+
+No bot code changes required.
+
+---
 
 ## Migration from v0.3.x to v0.4.0
 

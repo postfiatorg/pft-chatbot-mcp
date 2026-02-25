@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-02-24
+
+### Changed
+
+- **Keystone Envelope Format**: `send_message` now emits `keystone v1` envelope memos instead of `pf.ptr v4` pointer memos. This matches the pftasks frontend wire format. The scanner still reads both formats.
+- **Tasknode Sharing**: Encrypted message blobs now include a third recipient shard for the TaskNode by default, enabling server-side previews and task processing. Controlled by `share_with_tasknode` parameter (default: `true`).
+- **`content_type` Override**: When `share_with_tasknode` is `false`, the plaintext payload `content_type` is forced to `"encrypted"` to signal the TaskNode should not attempt decryption.
+- **Version Bump**: 0.4.1 → 0.5.0 (minor bump due to on-chain memo wire format change).
+
+### Added
+
+- **`share_with_tasknode` Parameter**: New optional boolean on `send_message` (default: `true`). Set `false` for fully private end-to-end encrypted messages without TaskNode visibility.
+- **`TASKNODE_ENCRYPTION_PUBKEY` Environment Variable**: Configures the TaskNode's X25519 public key for message sharing. Defaults to the testnet TaskNode key. Set to `"none"` or empty string to disable sharing.
+- **CID Fallback in Scanner**: If a Keystone envelope's `metadata.cid` is missing, the scanner now extracts the CID from the embedded `KeystoneCoreMessage.content_descriptor.uri` as a fallback.
+- **`buildKeystoneEnvelopeMemo()`**: New function in `src/chain/pointer.ts` for encoding Keystone v1 envelope memos (matching pftasks frontend format).
+- **`extractCidFromCoreMessage()`**: New helper in `src/chain/pointer.ts` for parsing CIDs from serialized `KeystoneCoreMessage` bytes.
+
+### Migration from v0.4.x
+
+**Breaking wire format change**: Bot messages now use `keystone v1` envelope memos on-chain instead of `pf.ptr v4` pointers. The MCP scanner reads both formats, so existing bots can still read old messages. However, **third-party tooling that only parses `pf.ptr v4` memos from bots will need to be updated** to also handle `keystone v1` envelopes.
+
+No code changes required for bot operators -- the upgrade is transparent. New env var `TASKNODE_ENCRYPTION_PUBKEY` defaults to the testnet key.
+
 ## [0.4.1] - 2026-02-24
 
 ### Changed

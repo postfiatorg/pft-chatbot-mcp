@@ -65,4 +65,34 @@ describe("sendMessageSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("accepts share_with_tasknode boolean", () => {
+    const resultTrue = sendMessageSchema.safeParse({
+      recipient: "rRecipient123",
+      message: "shared",
+      share_with_tasknode: true,
+    });
+    expect(resultTrue.success).toBe(true);
+
+    const resultFalse = sendMessageSchema.safeParse({
+      recipient: "rRecipient123",
+      message: "private",
+      share_with_tasknode: false,
+    });
+    expect(resultFalse.success).toBe(true);
+    if (resultFalse.success) {
+      expect(resultFalse.data.share_with_tasknode).toBe(false);
+    }
+  });
+
+  it("defaults share_with_tasknode to undefined (treated as true)", () => {
+    const result = sendMessageSchema.safeParse({
+      recipient: "rRecipient123",
+      message: "default sharing",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.share_with_tasknode).toBeUndefined();
+    }
+  });
 });
