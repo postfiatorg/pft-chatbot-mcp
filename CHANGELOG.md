@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-03-02
+
+### Changed
+
+- **IPFS Gateway Default Updated**: Changed the default/readme/example IPFS gateway URL from `https://pft-ipfs-testnet-node-1.fly.dev` to `https://ipfs-testnet.postfiat.org` in runtime config and setup docs.
+- **Patch Release**: 0.5.0 → 0.5.1 (non-breaking configuration/docs alignment).
+
 ## [0.5.0] - 2026-02-24
 
 ### Changed

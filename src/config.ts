@@ -127,7 +127,7 @@ export function loadConfig(): Config {
       process.env.PFTL_WSS_URL || "wss://ws.testnet.postfiat.org",
     ipfsGatewayUrl:
       process.env.IPFS_GATEWAY_URL ||
-      "https://pft-ipfs-testnet-node-1.fly.dev",
+      "https://ipfs-testnet.postfiat.org",
     keystoneGrpcUrl:
       process.env.KEYSTONE_GRPC_URL || "keystone-grpc.postfiat.org:443",
     keystoneApiKey,

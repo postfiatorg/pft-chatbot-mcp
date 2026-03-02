@@ -8,7 +8,7 @@ This is a [Model Context Protocol](https://modelcontextprotocol.io/) server that
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| @postfiatorg/pft-chatbot-mcp | 0.5.0 | This package |
+| @postfiatorg/pft-chatbot-mcp | 0.5.1 | This package |
 | Keystone Protocol | v1 | Proto schema version |
 | On-chain memo format | keystone v1 | Envelope format (since 0.5.0; scanner also reads pf.ptr v4) |
 | Keystone gRPC server | >= 0.3.0 | Backend service |
@@ -490,7 +490,7 @@ Most bots should use the default (fully shared) -- it enables server-side messag
 | `KEYSTONE_API_KEY` | Auto | - | Auto-provisioned on first `register_bot` call |
 | `PFTL_RPC_URL` | No | `https://rpc.testnet.postfiat.org` | Chain JSON-RPC endpoint |
 | `PFTL_WSS_URL` | No | `wss://ws.testnet.postfiat.org` | Chain WebSocket endpoint |
-| `IPFS_GATEWAY_URL` | No | `https://pft-ipfs-testnet-node-1.fly.dev` | Primary IPFS gateway for reads |
+| `IPFS_GATEWAY_URL` | No | `https://ipfs-testnet.postfiat.org` | Primary IPFS gateway for reads |
 | `KEYSTONE_GRPC_URL` | No | `keystone-grpc.postfiat.org:443` | Keystone gRPC service |
 | `PING_INTERVAL_MS` | No | `900000` (15 min) | Ping interval in ms. Set 0 to disable. |
 | `TASKNODE_ENCRYPTION_PUBKEY` | No | Testnet default | Base64-encoded X25519 public key for TaskNode message sharing. Set to `"none"` or `""` to disable. |
