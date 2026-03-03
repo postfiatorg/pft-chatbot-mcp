@@ -40,6 +40,68 @@ import {
   executeGetAttachment,
 } from "./tools/get_attachment.js";
 
+// ── PFTL DEX tools ────────────────────────────────────────────────────────────
+import {
+  dexGetBalancesSchema,
+  executeDexGetBalances,
+} from "./tools/dex_get_balances.js";
+import {
+  dexGetOrderBookSchema,
+  executeDexGetOrderBook,
+} from "./tools/dex_get_order_book.js";
+import {
+  dexGetAmmInfoSchema,
+  executeDexGetAmmInfo,
+} from "./tools/dex_get_amm_info.js";
+import {
+  dexGetOpenOrdersSchema,
+  executeDexGetOpenOrders,
+} from "./tools/dex_get_open_orders.js";
+import {
+  dexSetTrustLineSchema,
+  executeDexSetTrustLine,
+} from "./tools/dex_set_trust_line.js";
+import { dexSwapSchema, executeDexSwap } from "./tools/dex_swap.js";
+import {
+  dexPlaceLimitOrderSchema,
+  executeDexPlaceLimitOrder,
+} from "./tools/dex_place_limit_order.js";
+import {
+  dexCancelOrderSchema,
+  executeDexCancelOrder,
+} from "./tools/dex_cancel_order.js";
+import {
+  dexAmmDepositSchema,
+  executeDexAmmDeposit,
+} from "./tools/dex_amm_deposit.js";
+import {
+  dexAmmWithdrawSchema,
+  executeDexAmmWithdraw,
+} from "./tools/dex_amm_withdraw.js";
+
+// ── PFTL NFT tools ────────────────────────────────────────────────────────────
+import {
+  nftGetOwnedSchema,
+  executeNftGetOwned,
+} from "./tools/nft_get_owned.js";
+import {
+  nftGetListingsSchema,
+  executeNftGetListings,
+} from "./tools/nft_get_listings.js";
+import {
+  nftGetOffersSchema,
+  executeNftGetOffers,
+} from "./tools/nft_get_offers.js";
+import {
+  nftListForSaleSchema,
+  executeNftListForSale,
+} from "./tools/nft_list_for_sale.js";
+import { nftBuySchema, executeNftBuy } from "./tools/nft_buy.js";
+import {
+  nftCancelOfferSchema,
+  executeNftCancelOffer,
+} from "./tools/nft_cancel_offer.js";
+
 async function main() {
   // Try to load configuration -- if BOT_SEED is not set, the server starts
   // in setup mode with only create_wallet available.
@@ -386,6 +448,283 @@ async function main() {
             content: [{ type: "text", text: `Error: ${err.message}` }],
             isError: true,
           };
+        }
+      }
+    );
+
+    // ── PFTL DEX tools ──────────────────────────────────────────────────────
+
+    server.tool(
+      "dex_get_balances",
+      "Get the native PFT balance and all issued token trust-line balances for the bot's wallet or any PFTL address.",
+      { address: dexGetBalancesSchema.shape.address },
+      async (params) => {
+        try {
+          const result = await executeDexGetBalances(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    server.tool(
+      "dex_get_order_book",
+      'Fetch both sides of the PFTL DEX order book for any asset pair. Pass asset1 and asset2 as "PFT" or {currency, issuer}. Returns all resting orders with amounts and quality.',
+      {
+        asset1: dexGetOrderBookSchema.shape.asset1,
+        asset2: dexGetOrderBookSchema.shape.asset2,
+        limit:  dexGetOrderBookSchema.shape.limit,
+      },
+      async (params) => {
+        try {
+          const result = await executeDexGetOrderBook(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    server.tool(
+      "dex_get_amm_info",
+      'Get live AMM pool info for any asset pair on the PFTL chain. Pass asset1 and asset2 as "PFT" or {currency, issuer}. Returns reserves, spot price, LP token supply, and trading fee.',
+      {
+        asset1: dexGetAmmInfoSchema.shape.asset1,
+        asset2: dexGetAmmInfoSchema.shape.asset2,
+      },
+      async (params) => {
+        try {
+          const result = await executeDexGetAmmInfo(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    server.tool(
+      "dex_get_open_orders",
+      "Get all currently open limit orders for the bot's wallet or any PFTL address, across all trading pairs. Returns Sequence numbers needed for dex_cancel_order.",
+      {
+        address: dexGetOpenOrdersSchema.shape.address,
+        limit:   dexGetOpenOrdersSchema.shape.limit,
+      },
+      async (params) => {
+        try {
+          const result = await executeDexGetOpenOrders(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    server.tool(
+      "dex_set_trust_line",
+      "Establish or update a trust line for any issued token on the PFTL chain. Required before the bot can receive or hold that token. Safe to call again to update the limit.",
+      {
+        currency: dexSetTrustLineSchema.shape.currency,
+        issuer:   dexSetTrustLineSchema.shape.issuer,
+        limit:    dexSetTrustLineSchema.shape.limit,
+      },
+      async (params) => {
+        try {
+          const result = await executeDexSetTrustLine(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    server.tool(
+      "dex_swap",
+      'Execute a market swap on the PFTL DEX. Uses ImmediateOrCancel — fills at current market price, any unfilled remainder is discarded. Pass assets as "PFT" or {currency, issuer}. Use dex_get_order_book first to estimate fill. Receiving an issued token requires a trust line (dex_set_trust_line).',
+      {
+        sell:           dexSwapSchema.shape.sell,
+        sell_amount:    dexSwapSchema.shape.sell_amount,
+        buy:            dexSwapSchema.shape.buy,
+        min_buy_amount: dexSwapSchema.shape.min_buy_amount,
+      },
+      async (params) => {
+        try {
+          const result = await executeDexSwap(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    server.tool(
+      "dex_place_limit_order",
+      'Place a resting limit order on the PFTL DEX order book. Persists until fully matched or cancelled. Pass assets as "PFT" or {currency, issuer}. Use dex_get_open_orders for its Sequence and dex_cancel_order to remove it.',
+      {
+        sell:        dexPlaceLimitOrderSchema.shape.sell,
+        sell_amount: dexPlaceLimitOrderSchema.shape.sell_amount,
+        buy:         dexPlaceLimitOrderSchema.shape.buy,
+        buy_amount:  dexPlaceLimitOrderSchema.shape.buy_amount,
+      },
+      async (params) => {
+        try {
+          const result = await executeDexPlaceLimitOrder(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    server.tool(
+      "dex_cancel_order",
+      "Cancel an open limit order on the PFTL DEX by its Sequence number. Obtain the Sequence from dex_get_open_orders.",
+      { offer_sequence: dexCancelOrderSchema.shape.offer_sequence },
+      async (params) => {
+        try {
+          const result = await executeDexCancelOrder(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    server.tool(
+      "dex_amm_deposit",
+      'Deposit liquidity into a PFTL AMM pool and receive LP tokens. Pass assets as "PFT" or {currency, issuer}. Provide both amounts for a proportional two-asset deposit, or one amount for a single-asset deposit.',
+      {
+        asset1:        dexAmmDepositSchema.shape.asset1,
+        asset1_amount: dexAmmDepositSchema.shape.asset1_amount,
+        asset2:        dexAmmDepositSchema.shape.asset2,
+        asset2_amount: dexAmmDepositSchema.shape.asset2_amount,
+      },
+      async (params) => {
+        try {
+          const result = await executeDexAmmDeposit(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    server.tool(
+      "dex_amm_withdraw",
+      "Withdraw liquidity from a PFTL AMM pool by redeeming LP tokens. Use dex_get_amm_info for the LP token currency and issuer, and dex_get_balances for your LP token balance.",
+      {
+        asset1:             dexAmmWithdrawSchema.shape.asset1,
+        asset2:             dexAmmWithdrawSchema.shape.asset2,
+        lp_token_amount:    dexAmmWithdrawSchema.shape.lp_token_amount,
+        lp_token_currency:  dexAmmWithdrawSchema.shape.lp_token_currency,
+        lp_token_issuer:    dexAmmWithdrawSchema.shape.lp_token_issuer,
+      },
+      async (params) => {
+        try {
+          const result = await executeDexAmmWithdraw(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    // ── PFTL NFT tools ───────────────────────────────────────────────────────
+
+    server.tool(
+      "nft_get_owned",
+      "Get NFTs owned by the bot's wallet or any PFTL address. Supports pagination via marker. Set resolve_metadata=true to fetch IPFS name/description/image for each NFT (slower for large collections).",
+      {
+        address:          nftGetOwnedSchema.shape.address,
+        limit:            nftGetOwnedSchema.shape.limit,
+        marker:           nftGetOwnedSchema.shape.marker,
+        resolve_metadata: nftGetOwnedSchema.shape.resolve_metadata,
+      },
+      async (params) => {
+        try {
+          const result = await executeNftGetOwned(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    server.tool(
+      "nft_get_listings",
+      "Scan a PFTL NFT issuer's collection for NFTs with active sell offers. Returns price, offer_id, and IPFS URI for each listed NFT. Use marker to paginate through large collections.",
+      {
+        issuer: nftGetListingsSchema.shape.issuer,
+        limit:  nftGetListingsSchema.shape.limit,
+        marker: nftGetListingsSchema.shape.marker,
+      },
+      async (params) => {
+        try {
+          const result = await executeNftGetListings(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    server.tool(
+      "nft_get_offers",
+      "Get all active sell offers for a specific NFT by its NFTokenID. Returns offer IDs, prices, and owners. Use the offer_id with nft_buy to purchase.",
+      { nft_id: nftGetOffersSchema.shape.nft_id },
+      async (params) => {
+        try {
+          const result = await executeNftGetOffers(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    server.tool(
+      "nft_list_for_sale",
+      "Create an on-chain sell offer for an NFT owned by the bot. The offer is publicly visible on the PFTL ledger. Use nft_get_offers afterward to retrieve the offer_id.",
+      {
+        nft_id:      nftListForSaleSchema.shape.nft_id,
+        price_pft:   nftListForSaleSchema.shape.price_pft,
+        destination: nftListForSaleSchema.shape.destination,
+        expiration:  nftListForSaleSchema.shape.expiration,
+      },
+      async (params) => {
+        try {
+          const result = await executeNftListForSale(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    server.tool(
+      "nft_buy",
+      "Accept an NFT sell offer (purchase the NFT). Provide the offer_id from nft_get_listings or nft_get_offers. The listed PFT price is deducted from the bot's wallet.",
+      { offer_id: nftBuySchema.shape.offer_id },
+      async (params) => {
+        try {
+          const result = await executeNftBuy(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    server.tool(
+      "nft_cancel_offer",
+      "Cancel one or more of the bot's NFT sell offers, removing them from the ledger. Use nft_get_offers to find the offer IDs to cancel.",
+      { offer_ids: nftCancelOfferSchema.shape.offer_ids },
+      async (params) => {
+        try {
+          const result = await executeNftCancelOffer(config, keypair, params);
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
         }
       }
     );
