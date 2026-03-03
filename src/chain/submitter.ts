@@ -18,7 +18,7 @@ export type PftlAmount =
 /**
  * Call a JSON-RPC method on the PFTL HTTP endpoint.
  */
-async function rpcCall(rpcUrl: string, method: string, params: any = {}): Promise<any> {
+export async function rpcCall(rpcUrl: string, method: string, params: any = {}): Promise<any> {
   const resp = await fetch(rpcUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -218,6 +218,21 @@ export async function publishMessageKey(
 
   const signed = wallet.sign(txJson);
   return submitAndPoll(config.pftlRpcUrl, signed.tx_blob, signed.hash);
+}
+
+/**
+ * Prepare any transaction type by autofilling Sequence, Fee,
+ * LastLedgerSequence, and NetworkID.  The caller supplies a partial txJson
+ * with at minimum TransactionType and Account already set.
+ */
+export async function prepareTx(
+  config: Config,
+  wallet: Wallet,
+  txJson: any
+): Promise<PreparedTransaction> {
+  const ledger = await fetchLedgerInfo(config.pftlRpcUrl, wallet.address);
+  applyAutofill(txJson, ledger);
+  return { txJson, fee: txJson.Fee || "12" };
 }
 
 /**
