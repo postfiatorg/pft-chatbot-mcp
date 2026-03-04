@@ -1,0 +1,128 @@
+syntax = "proto3";
+package pf.signals.v1;
+
+import "google/protobuf/timestamp.proto";
+
+enum TradeSide {
+  TRADE_SIDE_UNSPECIFIED = 0;
+  TRADE_SIDE_BUY = 1;
+  TRADE_SIDE_SELL = 2;
+}
+
+enum TradeOrderType {
+  TRADE_ORDER_TYPE_UNSPECIFIED = 0;
+  // Execute immediately at current market price; no price guarantee.
+  TRADE_ORDER_TYPE_MARKET = 1;
+  // Execute only at limit_price or better.
+  TRADE_ORDER_TYPE_LIMIT = 2;
+  // Becomes a market order once the stop_price is reached.
+  TRADE_ORDER_TYPE_STOP = 3;
+}
+
+enum TradeStatus {
+  TRADE_STATUS_UNSPECIFIED = 0;
+  TRADE_STATUS_PENDING = 1;
+  TRADE_STATUS_FILLED = 2;
+  TRADE_STATUS_PARTIAL = 3;
+  TRADE_STATUS_CANCELLED = 4;
+  TRADE_STATUS_FAILED = 5;
+}
+
+// An agent's declared intent to execute a trade on the PFTL DEX.
+// Broadcast to counterparty agents or a market-making agent before
+// the on-chain transaction is submitted.
+//
+// All price/quantity fields are decimal strings in standard notation
+// (e.g. "123.456"); no scientific notation.
+//
+// Corresponds to SignalKind.SIGNAL_KIND_TRADE_INTENT and
+// ContentKind.TRADE_INTENT.
+message TradeIntent {
+  // Unique identifier for this intent (UUID v4).
+  string intent_id = 1;
+
+  // Wallet address of the agent expressing the intent.
+  string agent_id = 2;
+
+  TradeSide side = 3;
+  TradeOrderType order_type = 4;
+
+  // Asset to buy or sell (ticker, e.g. "PFT" for the native asset).
+  string base_asset = 5;
+  // Asset used for payment / denomination (ticker, e.g. "PFT" for native).
+  string quote_asset = 6;
+
+  // XRPL issuer addresses.  Must be empty for PFT (PFTL native asset).
+  string base_issuer = 7;
+  string quote_issuer = 8;
+
+  // Desired quantity in base asset.  Decimal string, standard notation.
+  string quantity = 9;
+
+  // For LIMIT orders: maximum buy price / minimum sell price.
+  // Decimal string, standard notation.
+  string limit_price = 10;
+
+  // For STOP orders: price that triggers order activation.
+  // Decimal string, standard notation.
+  string stop_price = 11;
+
+  // Maximum acceptable slippage from quoted price, in basis points (0–10000).
+  uint32 max_slippage_bps = 12;
+
+  // Intent expires at this time; do not fill after expiry.
+  google.protobuf.Timestamp expires_at = 13;
+
+  // Links this intent back to the originating PriceQuote or signal chain.
+  string correlation_id = 14;
+
+  // Arbitrary metadata (e.g. strategy tag, order source).
+  map<string, string> metadata = 15;
+}
+
+// Confirms the outcome of a TradeIntent after the PFTL transaction settles.
+// Sent by the executing agent back to the originating agent.
+//
+// Corresponds to SignalKind.SIGNAL_KIND_TRADE_CONFIRMATION and
+// ContentKind.TRADE_CONFIRMATION.
+message TradeConfirmation {
+  // Unique identifier for this confirmation.
+  string confirmation_id = 1;
+
+  // Matches the TradeIntent.intent_id this confirmation corresponds to.
+  string intent_id = 2;
+
+  // Wallet address of the agent that executed the trade.
+  string agent_id = 3;
+
+  TradeStatus status = 4;
+
+  // Actual quantity filled in base asset (may be less than intent quantity
+  // for partial fills or market-impact slippage).  Decimal string.
+  string filled_quantity = 5;
+
+  // Weighted average fill price in quote asset per 1 base asset.
+  // Decimal string, standard notation.
+  string filled_price = 6;
+
+  // PFTL transaction hash of the offer/payment that settled the trade.
+  string tx_hash = 7;
+
+  // PFTL ledger sequence in which the transaction was validated.
+  // XRPL ledger indices are 32-bit unsigned integers.
+  uint32 ledger_index = 8;
+
+  // Wall-clock time the transaction was validated on-chain.
+  google.protobuf.Timestamp confirmed_at = 9;
+
+  // Transaction fee paid in drops of PFT (PFTL native currency).
+  // 1 PFT = 1,000,000 drops.  Note: the XRPL wire format uses "XRP" as the
+  // internal tag for native-currency amounts, but on PFTL the native asset
+  // is PFT, not XRP.
+  uint64 fee_drops = 10;
+
+  // Human-readable failure reason when status = FAILED or CANCELLED.
+  string failure_reason = 11;
+
+  map<string, string> metadata = 12;
+}

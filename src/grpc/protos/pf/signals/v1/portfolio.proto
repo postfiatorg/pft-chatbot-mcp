@@ -1,0 +1,106 @@
+syntax = "proto3";
+package pf.signals.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Holdings in a single asset as reported by an agent.
+message AssetPosition {
+  // Ticker symbol, e.g. "PFT", "USDC".
+  string asset = 1;
+
+  // XRPL issuer address.  Must be empty for PFT (PFTL native asset).
+  string issuer = 2;
+
+  // Current balance.
+  // Decimal string in standard notation (e.g. "123.456789").  No scientific notation.
+  string balance = 3;
+
+  // Estimated current value denominated in PFT (PFTL native currency).
+  // Derived from the most recent PriceQuote available to the agent.
+  // Decimal string.  1 PFT = 1,000,000 drops.
+  string value_in_pft = 4;
+
+  // Unrealised profit/loss in PFT since the agent's average cost basis.
+  // Positive = gain, negative = loss.  Decimal string.
+  string unrealized_pnl_pft = 5;
+
+  // Time at which this position snapshot was recorded.
+  google.protobuf.Timestamp as_of = 6;
+}
+
+// A snapshot of an agent's full portfolio at a point in time.
+// Agents broadcast this to signal their current exposure to
+// counterparty agents or risk-monitoring agents.
+//
+// Corresponds to SignalKind.SIGNAL_KIND_POSITION_UPDATE and
+// ContentKind.POSITION_UPDATE.
+message PositionUpdate {
+  // Wallet address of the agent reporting its positions.
+  string agent_id = 1;
+
+  // All asset positions held by the agent.
+  repeated AssetPosition positions = 2;
+
+  // Sum of value_in_pft across all positions.
+  // Decimal string denominated in PFT (PFTL native currency).
+  string total_value_pft = 3;
+
+  // When this snapshot was taken.
+  google.protobuf.Timestamp snapshot_at = 4;
+
+  map<string, string> metadata = 5;
+}
+
+enum RiskLevel {
+  RISK_LEVEL_UNSPECIFIED = 0;
+  RISK_LEVEL_LOW = 1;
+  RISK_LEVEL_MEDIUM = 2;
+  RISK_LEVEL_HIGH = 3;
+  RISK_LEVEL_CRITICAL = 4;
+}
+
+// Quantitative risk metrics computed by a risk-assessment agent and
+// broadcast to trading agents or a central risk monitor.
+//
+// All ratio/percentage fields use decimal strings for full precision.
+// Standard decimal notation only (e.g. "12.5"); no scientific notation.
+//
+// Corresponds to SignalKind.SIGNAL_KIND_RISK_METRIC and
+// ContentKind.RISK_METRIC.
+message RiskMetric {
+  // Wallet address of the agent these metrics describe.
+  string agent_id = 1;
+
+  // Aggregate risk classification derived from all metrics below.
+  RiskLevel overall_level = 2;
+
+  // Value at Risk at 95% confidence interval, denominated in PFT (PFTL native currency).
+  // Represents the maximum expected loss over a 1-day horizon.
+  // Decimal string.  1 PFT = 1,000,000 drops.
+  string var_95_pft = 3;
+
+  // Maximum peak-to-trough portfolio drawdown observed in the
+  // measurement window, as a percentage string (e.g. "12.5" = 12.5%).
+  string max_drawdown_pct = 4;
+
+  // Sharpe ratio: excess return per unit of risk (decimal string).
+  // Positive values indicate risk-adjusted outperformance.
+  string sharpe_ratio = 5;
+
+  // Liquid assets (PFT + stablecoins) divided by total portfolio value.
+  // Range [0, 1] as a decimal string (e.g. "0.65" = 65% liquid).
+  string liquidity_ratio = 6;
+
+  // Concentration risk: fraction of portfolio held in the largest
+  // single position.  Range [0, 1] (decimal string).
+  string concentration_ratio = 7;
+
+  // Duration of the measurement window for these metrics, in seconds.
+  uint64 window_seconds = 8;
+
+  // When these metrics were computed.
+  google.protobuf.Timestamp computed_at = 9;
+
+  // Extensible slot for additional named metrics (e.g. "beta", "sortino").
+  map<string, string> custom_metrics = 10;
+}

@@ -1,0 +1,68 @@
+syntax = "proto3";
+package pf.signals.v1;
+
+import "google/protobuf/timestamp.proto";
+import "pf/common/v4/common.proto";
+
+// Top-level kind for each financial signal type.
+// Mirrors the ContentKind values added in pf.common.v4.
+enum SignalKind {
+  SIGNAL_KIND_UNSPECIFIED = 0;
+  SIGNAL_KIND_PRICE_QUOTE = 1;
+  SIGNAL_KIND_TRADE_INTENT = 2;
+  SIGNAL_KIND_TRADE_CONFIRMATION = 3;
+  SIGNAL_KIND_POSITION_UPDATE = 4;
+  SIGNAL_KIND_RISK_METRIC = 5;
+  SIGNAL_KIND_REWARD_OFFER = 6;
+  SIGNAL_KIND_POLICY_UPDATE = 7;
+}
+
+// AgentFinancialSignal is the top-level wrapper for all financial signals
+// exchanged between Post Fiat agents.
+//
+// Transport: serialized bytes of this message are placed in
+// KeystoneCoreMessage.metadata["signal"] (for inline signals) or stored
+// at an IPFS CID and referenced via KeystoneContentDescriptor with
+// content_type = "application/x-pft-signal+proto".
+//
+// The KeystoneEnvelope.metadata["signal_kind"] should be set to the
+// string representation of the SignalKind for scanner-side filtering
+// without full deserialization.
+message AgentFinancialSignal {
+  // Unique identifier for this signal (UUID v4 or SHA-256 hex of payload).
+  string signal_id = 1;
+
+  // Wallet address of the sending agent.
+  string sender_agent_id = 2;
+
+  // Wallet address of the intended recipient.
+  // Empty string indicates a broadcast signal (any subscribed agent may act).
+  string recipient_agent_id = 3;
+
+  // Discriminates which signal-specific message is carried in payload.
+  SignalKind kind = 4;
+
+  // pf.common.v4 ContentKind for cross-system tagging (e.g. PRICE_QUOTE).
+  pf.common.v4.ContentKind content_kind = 5;
+
+  // When this signal was created by the sender.
+  google.protobuf.Timestamp created_at = 6;
+
+  // After this time the signal should be considered stale and ignored.
+  // Unset means no expiry.
+  google.protobuf.Timestamp expires_at = 7;
+
+  // Serialized signal-specific protobuf message (PriceQuote, TradeIntent, etc.)
+  // The receiver uses `kind` to determine which message type to deserialize.
+  bytes payload = 8;
+
+  // Links related signals together (e.g. quote → intent → confirmation chain).
+  string correlation_id = 9;
+
+  // Schema version of the payload message, for forward compatibility.
+  // Increment when breaking changes are made to a signal-specific message.
+  uint32 schema_version = 10;
+
+  // Arbitrary key-value metadata for extensibility without schema changes.
+  map<string, string> metadata = 11;
+}

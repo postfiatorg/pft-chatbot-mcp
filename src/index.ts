@@ -102,6 +102,16 @@ import {
   executeNftCancelOffer,
 } from "./tools/nft_cancel_offer.js";
 
+// ── Financial signal tools ─────────────────────────────────────────────────
+import {
+  sendFinancialSignalSchema,
+  executeSendFinancialSignal,
+} from "./tools/send_financial_signal.js";
+import {
+  decodeFinancialSignalSchema,
+  executeDecodeFinancialSignal,
+} from "./tools/decode_financial_signal.js";
+
 async function main() {
   // Try to load configuration -- if BOT_SEED is not set, the server starts
   // in setup mode with only create_wallet available.
@@ -725,6 +735,73 @@ async function main() {
           return { content: [{ type: "text", text: result }] };
         } catch (err: any) {
           return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+        }
+      }
+    );
+
+    // ── Financial signal tools ───────────────────────────────────────────────
+
+    server.tool(
+      "send_financial_signal",
+      "Send a structured protobuf-encoded financial signal to another Post Fiat agent. " +
+        "Signals replace free-text messages for machine-readable financial data: price quotes, " +
+        "trade intents, trade confirmations, portfolio snapshots, and risk metrics. " +
+        "The signal is encrypted, uploaded to IPFS, and delivered on-chain just like a regular message. " +
+        "Use decode_financial_signal on the receiving side to deserialize the payload.",
+      {
+        recipient:            sendFinancialSignalSchema.shape.recipient,
+        signal_kind:          sendFinancialSignalSchema.shape.signal_kind,
+        signal_data:          sendFinancialSignalSchema.shape.signal_data,
+        correlation_id:       sendFinancialSignalSchema.shape.correlation_id,
+        expires_at:           sendFinancialSignalSchema.shape.expires_at,
+        amount_pft:           sendFinancialSignalSchema.shape.amount_pft,
+        amount_drops:         sendFinancialSignalSchema.shape.amount_drops,
+        thread_id:            sendFinancialSignalSchema.shape.thread_id,
+        reply_to_tx:          sendFinancialSignalSchema.shape.reply_to_tx,
+        share_with_tasknode:  sendFinancialSignalSchema.shape.share_with_tasknode,
+      },
+      async (params) => {
+        try {
+          const result = await executeSendFinancialSignal(
+            config,
+            keypair,
+            grpcClient,
+            params
+          );
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return {
+            content: [{ type: "text", text: `Error: ${err.message}` }],
+            isError: true,
+          };
+        }
+      }
+    );
+
+    server.tool(
+      "decode_financial_signal",
+      "Fetch, decrypt, and deserialize a financial signal message sent by another agent. " +
+        "Provide either a tx_hash (from scan_messages) or a CID. " +
+        "Returns the fully decoded signal including the kind-specific payload fields " +
+        "(e.g. bid_price/ask_price for price_quote, filled_price/tx_hash for trade_confirmation). " +
+        "Only works on messages sent with send_financial_signal.",
+      {
+        tx_hash: decodeFinancialSignalSchema.shape.tx_hash,
+        cid:     decodeFinancialSignalSchema.shape.cid,
+      },
+      async (params) => {
+        try {
+          const result = await executeDecodeFinancialSignal(
+            config,
+            keypair,
+            params
+          );
+          return { content: [{ type: "text", text: result }] };
+        } catch (err: any) {
+          return {
+            content: [{ type: "text", text: `Error: ${err.message}` }],
+            isError: true,
+          };
         }
       }
     );

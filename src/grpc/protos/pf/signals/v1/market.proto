@@ -1,0 +1,99 @@
+syntax = "proto3";
+package pf.signals.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Identifies a trading pair on the PFTL DEX.
+// PFT is the native asset and must always have an empty issuer field.
+// All other assets require both a currency code and an issuer address.
+message AssetPair {
+  // Ticker symbol, e.g. "PFT", "USDC", "BTC".
+  // Use "PFT" for the PFTL native asset (no issuer required).
+  string base_asset = 1;
+  string quote_asset = 2;
+
+  // XRPL issuer address for non-native assets.
+  // Must be empty when the asset is PFT (the PFTL native currency).
+  string base_issuer = 3;
+  string quote_issuer = 4;
+}
+
+// A point-in-time price quote for an asset pair, emitted by a market-making
+// or oracle agent.
+//
+// All price/volume fields are decimal strings to preserve PFTL's full token
+// precision.  Use standard decimal notation (e.g. "0.000123"); no scientific
+// notation.  For PFT (native) amounts, values represent whole PFT units
+// (not drops).
+message PriceQuote {
+  // The pair being quoted.
+  AssetPair pair = 1;
+
+  // Best bid (highest buy) price in quote asset per 1 base asset.
+  // Decimal string, standard notation.
+  string bid_price = 2;
+
+  // Best ask (lowest sell) price in quote asset per 1 base asset.
+  // Decimal string, standard notation.
+  string ask_price = 3;
+
+  // Mid-market price ((bid + ask) / 2).
+  // Decimal string, standard notation.
+  string mid_price = 4;
+
+  // 24-hour rolling volume in base asset.
+  // Decimal string, standard notation.
+  string volume_24h = 5;
+
+  // Percentage change vs 24 hours ago (e.g. "2.35" means +2.35%).
+  // Decimal string, standard notation.
+  string change_pct_24h = 6;
+
+  // When this quote was computed by the source agent.
+  google.protobuf.Timestamp quoted_at = 7;
+
+  // Quote is invalid after this time.  Receivers must not act on stale quotes.
+  google.protobuf.Timestamp valid_until = 8;
+
+  // Wallet address of the agent providing this quote.
+  string source_agent_id = 9;
+
+  // Agent's self-reported confidence in this quote, in basis points (0–10000).
+  // 10000 = 100% confidence (e.g. live on-chain order book data).
+  uint32 confidence_bps = 10;
+}
+
+// A single price level in an order book.
+message OrderBookLevel {
+  // Price in quote asset per 1 base asset.  Decimal string, standard notation.
+  string price = 1;
+
+  // Total quantity available at this price level, in base asset.
+  // Decimal string, standard notation.
+  string quantity = 2;
+
+  // Number of distinct open offers at this price level.
+  uint32 offer_count = 3;
+}
+
+// A snapshot of the order book for an asset pair at a point in time.
+// Emitted by agents that monitor the PFTL DEX.
+message OrderBookSnapshot {
+  AssetPair pair = 1;
+
+  // Bids sorted descending by price (best bid first).
+  repeated OrderBookLevel bids = 2;
+
+  // Asks sorted ascending by price (best ask first).
+  repeated OrderBookLevel asks = 3;
+
+  // PFTL ledger sequence at which this snapshot was taken.
+  // XRPL ledger indices are 32-bit unsigned integers.
+  uint32 ledger_index = 4;
+
+  // Wall-clock time of the snapshot.
+  google.protobuf.Timestamp snapshot_at = 5;
+
+  // Number of levels included on each side.
+  uint32 depth = 6;
+}
