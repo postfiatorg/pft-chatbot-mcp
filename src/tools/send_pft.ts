@@ -28,29 +28,39 @@ export async function executeSendPft(
   keypair: BotKeypair,
   params: SendPftParams
 ): Promise<string> {
-  // Validate that at least one amount is provided
-  if (!params.amount_pft && !params.amount_drops) {
+  // Distinguish supplied fields from truthy strings: even an empty selector
+  // must not silently override or bypass the mutually exclusive contract.
+  const hasPft = params.amount_pft !== undefined;
+  const hasDrops = params.amount_drops !== undefined;
+  if (!hasPft && !hasDrops) {
     throw new Error("Either amount_pft or amount_drops must be provided.");
+  }
+  if (hasPft && hasDrops) {
+    throw new Error("amount_pft and amount_drops are mutually exclusive.");
   }
 
   // Determine PFT amount in drops
   let amountDrops: string;
-  if (params.amount_pft) {
-    const pftValue = parseFloat(params.amount_pft);
-    if (isNaN(pftValue) || pftValue <= 0) {
+  if (hasPft) {
+    const value = params.amount_pft!;
+    if (!/^(?:\d+(?:\.\d{0,6})?|\.\d{1,6})$/.test(value)) {
       throw new Error(
-        `Invalid amount_pft: "${params.amount_pft}". Must be a positive number.`
+        `Invalid amount_pft: "${value}". Must be a positive decimal with at most six fractional digits.`
       );
     }
-    amountDrops = Math.round(pftValue * 1_000_000).toString();
+    const [whole, fraction = ""] = value.split(".");
+    amountDrops = (BigInt(whole || "0") * 1_000_000n + BigInt(fraction.padEnd(6, "0"))).toString();
   } else {
-    const dropsValue = parseInt(params.amount_drops!, 10);
-    if (isNaN(dropsValue) || dropsValue <= 0) {
+    const value = params.amount_drops!;
+    if (!/^\d+$/.test(value)) {
       throw new Error(
-        `Invalid amount_drops: "${params.amount_drops}". Must be a positive integer.`
+        `Invalid amount_drops: "${value}". Must be a positive integer.`
       );
     }
-    amountDrops = dropsValue.toString();
+    amountDrops = BigInt(value).toString();
+  }
+  if (BigInt(amountDrops) <= 0n) {
+    throw new Error("Amount must be at least one drop.");
   }
 
   // Prepare payment (no memo)
@@ -68,7 +78,8 @@ export async function executeSendPft(
     prepared.txJson
   );
 
-  const pftSent = (parseInt(amountDrops, 10) / 1_000_000).toFixed(6);
+  const exactDrops = BigInt(amountDrops);
+  const pftSent = `${exactDrops / 1_000_000n}.${(exactDrops % 1_000_000n).toString().padStart(6, "0")}`;
 
   return JSON.stringify(
     {
