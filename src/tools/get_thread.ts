@@ -12,7 +12,7 @@ export const getThreadSchema = z.object({
   thread_id: z
     .string()
     .optional()
-    .describe("Thread ID to fetch all messages for"),
+    .describe("Thread ID to fetch messages for; requires contact_address for participant authorization"),
   contact_address: z
     .string()
     .optional()
@@ -39,6 +39,11 @@ export async function executeGetThread(
   if (!params.thread_id && !params.contact_address) {
     return "Error: provide either thread_id or contact_address";
   }
+  // Thread IDs are sender-asserted, not authority to join a conversation.
+  // Require caller-selected contact context and bind it to ledger addresses.
+  if (params.thread_id && !params.contact_address) {
+    return "Error: thread_id requires contact_address to authorize thread participants";
+  }
 
   const allMessages = await scanMessages(config, keypair.address, {
     limit: params.limit || 200,
@@ -47,7 +52,11 @@ export async function executeGetThread(
   // Filter by thread_id or contact address
   let filtered: ScannedMessage[];
   if (params.thread_id) {
-    filtered = allMessages.filter((m) => m.threadId === params.thread_id);
+    filtered = allMessages.filter((m) =>
+      m.threadId === params.thread_id &&
+      ((m.sender === keypair.address && m.recipient === params.contact_address) ||
+       (m.sender === params.contact_address && m.recipient === keypair.address))
+    );
   } else {
     filtered = allMessages.filter(
       (m) =>

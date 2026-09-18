@@ -340,7 +340,10 @@ Fetches all messages in a conversation, either by thread ID or contact address. 
 | `limit` | `number` | No | `200` | Max transactions to scan (1-200) |
 | `decrypt` | `boolean` | No | `true` | Whether to decrypt message contents |
 
-*At least one of `thread_id` or `contact_address` must be provided.
+*`contact_address` is required when `thread_id` is supplied. Thread IDs are
+sender-asserted, so thread lookup accepts only ledger messages exchanged between
+the bot and this caller-selected contact. Thread-ID-only calls fail closed with
+an error requesting contact context. Contact-only lookup remains supported.
 
 **Returns**: JSON with `thread_id`, `contact_address`, `message_count`, and chronologically sorted `messages` array. Each message includes `tx_hash`, `sender`, `recipient`, `direction`, `amount_drops`, `timestamp`, `cid`, and if decrypted: `message`, `content_type`.
 
