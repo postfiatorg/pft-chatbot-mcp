@@ -121,12 +121,27 @@ export interface RequestApiKeyResponse {
   expiresAtUnix: string; // long as string
 }
 
-// Promisify a gRPC unary call
+const DEFAULT_GRPC_DEADLINE_MS = 30_000;
+
+function grpcDeadlineMs(): number {
+  const configured = process.env.KEYSTONE_GRPC_DEADLINE_MS;
+  if (configured === undefined || configured === "") {
+    return DEFAULT_GRPC_DEADLINE_MS;
+  }
+  const milliseconds = Number(configured);
+  if (!Number.isSafeInteger(milliseconds) || milliseconds < 1 || milliseconds > 300_000) {
+    throw new Error("KEYSTONE_GRPC_DEADLINE_MS must be an integer from 1 to 300000");
+  }
+  return milliseconds;
+}
+
+// Promisify a gRPC unary call with a bounded transport deadline.
 function promisify<TReq, TRes>(
   client: grpc.Client,
   method: (
     req: TReq,
     metadata: grpc.Metadata,
+    options: grpc.CallOptions,
     callback: (err: grpc.ServiceError | null, res: TRes) => void
   ) => void
 ): (req: TReq, metadata?: grpc.Metadata) => Promise<TRes> {
@@ -136,6 +151,7 @@ function promisify<TReq, TRes>(
         client,
         req,
         metadata || new grpc.Metadata(),
+        { deadline: new Date(Date.now() + grpcDeadlineMs()) },
         (err: grpc.ServiceError | null, res: TRes) => {
           if (err) reject(err);
           else resolve(res);
