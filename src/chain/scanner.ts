@@ -226,6 +226,10 @@ export async function getAccountInfo(
     }),
   });
 
+  if (!response.ok) {
+    throw new Error(`account_info failed: ${response.status} ${response.statusText}`);
+  }
+
   const json = (await response.json()) as any;
   if (json.result?.error) {
     throw new Error(
