@@ -42,14 +42,17 @@ function buildGatewayUrls(config: Config, cid: string): string[] {
 /**
  * Fetch with a timeout.
  */
-async function fetchWithTimeout(
+async function fetchWithTimeout<T>(
   url: string,
-  timeoutMs: number
-): Promise<Response> {
+  timeoutMs: number,
+  consume: (response: Response) => Promise<T>
+): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { signal: controller.signal });
+    const response = await fetch(url, { signal: controller.signal });
+    // Keep the deadline active until the response body is consumed.
+    return await consume(response);
   } finally {
     clearTimeout(timer);
   }
@@ -69,12 +72,10 @@ export async function fetchIpfsJson(
 
   for (const url of urls) {
     try {
-      const response = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
-      if (!response.ok) {
-        errors.push(`${url}: ${response.status}`);
-        continue;
-      }
-      return await response.json();
+      return await fetchWithTimeout(url, FETCH_TIMEOUT_MS, async (response) => {
+        if (!response.ok) throw new Error(String(response.status));
+        return await response.json();
+      });
     } catch (err: any) {
       errors.push(`${url}: ${err.message}`);
       continue;
@@ -99,13 +100,11 @@ export async function fetchIpfsBytes(
 
   for (const url of urls) {
     try {
-      const response = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
-      if (!response.ok) {
-        errors.push(`${url}: ${response.status}`);
-        continue;
-      }
-      const arrayBuf = await response.arrayBuffer();
-      return Buffer.from(arrayBuf);
+      return await fetchWithTimeout(url, FETCH_TIMEOUT_MS, async (response) => {
+        if (!response.ok) throw new Error(String(response.status));
+        const arrayBuf = await response.arrayBuffer();
+        return Buffer.from(arrayBuf);
+      });
     } catch (err: any) {
       errors.push(`${url}: ${err.message}`);
       continue;
