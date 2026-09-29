@@ -5,9 +5,12 @@ import type { KeystoneClient } from "../grpc/client.js";
 import { encryptBinaryForRecipients } from "../crypto/encrypt.js";
 import { resolveRecipientKey } from "../crypto/resolve_key.js";
 
-// IPFS storage is capped at 10 MB per file on the Keystone gateway.
-// Encrypted blobs are slightly larger than the original due to AEAD overhead + base64 + JSON wrapper,
-// so the raw content limit is set conservatively below 10 MB.
+// IPFS storage is capped at 10 MB per file on the Keystone gateway. The cap
+// applies to the bytes that are actually uploaded, so every upload is measured
+// on its own payload: the raw buffer on the plaintext path, and the encrypted
+// blob on the encrypt_for path. Encrypted blobs are ~4/3 the size of the
+// original (AEAD overhead + base64 + JSON wrapper), so a raw buffer under the
+// cap can still produce a blob above it.
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 export const uploadContentSchema = z.object({
@@ -71,6 +74,16 @@ export async function executeUploadContent(
     ]);
 
     const blobBytes = Buffer.from(JSON.stringify(encryptedBlob), "utf8");
+
+    if (blobBytes.length > MAX_UPLOAD_BYTES) {
+      throw new Error(
+        `Encrypted content too large for upload: ${blobBytes.length} bytes ` +
+          `after encrypting ${originalSize} bytes of content ` +
+          `(max ${MAX_UPLOAD_BYTES} bytes). ` +
+          "Split into smaller parts."
+      );
+    }
+
     const result = await grpcClient.storeContent(blobBytes, "application/json");
     const cid = result.descriptor.uri.replace("ipfs://", "");
 
