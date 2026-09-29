@@ -257,27 +257,51 @@ export async function getAccountLines(
   rpcUrl: string,
   address: string
 ): Promise<TrustLine[]> {
-  const response = await fetch(rpcUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      method: "account_lines",
-      params: [{ account: address }],
-    }),
-  });
+  const params: Record<string, unknown> = { account: address, ledger_index: "validated" };
+  const trustLines: TrustLine[] = [];
+  const seenMarkers = new Set<string>();
 
-  const json = (await response.json()) as any;
-  if (json.result?.error) {
-    throw new Error(
-      `account_lines error: ${json.result.error_message || json.result.error}`
-    );
+  while (true) {
+    const response = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ method: "account_lines", params: [params] }),
+    });
+    if (!response.ok) {
+      throw new Error(`account_lines failed: ${response.status} ${response.statusText}`);
+    }
+    const json = (await response.json()) as any;
+    if (json.result?.error) {
+      throw new Error(
+        `account_lines error: ${json.result.error_message || json.result.error}`
+      );
+    }
+
+    const result = json.result;
+    trustLines.push(...(result?.lines || []).map((line: any) => ({
+      currency: line.currency || "",
+      issuer: line.account || "",
+      balance: line.balance || "0",
+      limit: line.limit || "0",
+    })));
+    if (result?.marker == null) return trustLines;
+
+    // Resolve the initial validated ledger once; all pages must use that ledger.
+    if (params.ledger_index === "validated") {
+      if (result.ledger_hash) {
+        delete params.ledger_index;
+        params.ledger_hash = result.ledger_hash;
+      } else if (typeof result.ledger_index === "number") {
+        params.ledger_index = result.ledger_index;
+      } else {
+        throw new Error("account_lines pagination response missing ledger identity");
+      }
+    }
+    const markerKey = JSON.stringify(result.marker);
+    if (seenMarkers.has(markerKey)) {
+      throw new Error("account_lines returned repeated pagination marker");
+    }
+    seenMarkers.add(markerKey);
+    params.marker = result.marker;
   }
-
-  const lines = json.result?.lines || [];
-  return lines.map((line: any) => ({
-    currency: line.currency || "",
-    issuer: line.account || "",
-    balance: line.balance || "0",
-    limit: line.limit || "0",
-  }));
 }
