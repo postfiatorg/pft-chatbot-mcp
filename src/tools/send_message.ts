@@ -158,10 +158,34 @@ export async function executeSendMessage(
   // 9. Sign and submit
   const result = await signAndSubmit(config, keypair.wallet, prepared.txJson);
 
-  if (result.result !== "tesSUCCESS") {
+  if (result.status === "pending") {
+    // Not a failure: the payment may still validate. Say so instead of
+    // "Transaction failed", which invited a blind resend (double payment).
+    return JSON.stringify(
+      {
+        status: "pending",
+        warning:
+          "Transaction was submitted but had not validated when polling stopped. " +
+          "It may still validate; check tx_hash before resending.",
+        tx_hash: result.txHash,
+        cid,
+        thread_id: params.thread_id || null,
+        recipient: params.recipient,
+        amount_pft: amountPft,
+        amount_drops: amountDrops,
+        last_ledger_sequence: result.lastLedgerSequence ?? null,
+        result: result.result,
+      },
+      null,
+      2
+    );
+  }
+
+  if (result.status !== "validated" || result.result !== "tesSUCCESS") {
     return JSON.stringify(
       {
         error: `Transaction failed: ${result.result}`,
+        status: result.status,
         tx_hash: result.txHash,
       },
       null,
@@ -172,6 +196,7 @@ export async function executeSendMessage(
   return JSON.stringify(
     {
       tx_hash: result.txHash,
+      status: result.status,
       cid,
       thread_id: params.thread_id || null,
       recipient: params.recipient,

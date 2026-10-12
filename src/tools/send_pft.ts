@@ -73,7 +73,16 @@ export async function executeSendPft(
   return JSON.stringify(
     {
       tx_hash: submitResult.txHash,
+      status: submitResult.status,
       result: submitResult.result,
+      ...(submitResult.status === "pending"
+        ? {
+            warning:
+              "Transaction was submitted but had not validated when polling stopped. " +
+              "It may still validate; check tx_hash before resending.",
+            last_ledger_sequence: submitResult.lastLedgerSequence ?? null,
+          }
+        : {}),
       recipient: params.recipient,
       amount_pft: pftSent,
       amount_drops: amountDrops,

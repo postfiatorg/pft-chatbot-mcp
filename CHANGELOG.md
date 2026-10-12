@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Reliable submission status**: `signAndSubmit` / `publishMessageKey` now return a `status` of `validated`, `pending`, `expired` or `rejected` instead of a free-text "not yet validated" result. Polling detects a passed `LastLedgerSequence` (via `server_info`) and reports `expired` as final only after a `tx` lookup bounded by `min_ledger`/`max_ledger` returns `txnNotFound` with `searched_all: true`; a failed, errored or incomplete final lookup stays `pending`; a transaction still in flight when the polling budget ends is reported as `pending`. `send_message` no longer labels a pending payment "Transaction failed" (which invited a blind resend); `send_message` and `send_pft` return `status` (plus `warning` and `last_ledger_sequence` when pending) and `register_bot` distinguishes a pending MessageKey transaction from a failed one.
+
 ## [0.5.1] - 2026-03-02
 
 ### Changed

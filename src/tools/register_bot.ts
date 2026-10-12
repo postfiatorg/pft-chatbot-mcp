@@ -147,8 +147,10 @@ export async function executeRegisterBot(
         keypair.wallet,
         messageKeyHex
       );
-      if (keyResult.result === "tesSUCCESS") {
+      if (keyResult.status === "validated" && keyResult.result === "tesSUCCESS") {
         messageKeyPublished = true;
+      } else if (keyResult.status === "pending") {
+        messageKeyWarning = `MessageKey transaction ${keyResult.txHash} was submitted but had not validated when polling stopped; it may still take effect. Check the transaction before re-registering.`;
       } else {
         messageKeyWarning = `MessageKey transaction failed: ${keyResult.result}. Others may not be able to send encrypted messages until the key is published.`;
       }
